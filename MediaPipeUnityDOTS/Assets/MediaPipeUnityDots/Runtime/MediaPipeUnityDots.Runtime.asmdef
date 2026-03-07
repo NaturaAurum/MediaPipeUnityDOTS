@@ -1,0 +1,14 @@
+{
+  "name": "MediaPipeUnityDots.Runtime",
+  "rootNamespace": "MediaPipeUnityDots.Runtime",
+  "references": [],
+  "includePlatforms": [],
+  "excludePlatforms": [],
+  "allowUnsafeCode": true,
+  "overrideReferences": false,
+  "precompiledReferences": [],
+  "autoReferenced": true,
+  "defineConstraints": [],
+  "versionDefines": [],
+  "noEngineReferences": false
+}
