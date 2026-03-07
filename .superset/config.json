@@ -1,0 +1,7 @@
+{
+  "setup": [
+    "./.superset/setup-unity-worktree.sh",
+    "./.superset/open-unity-project.sh"
+  ],
+  "teardown": []
+}
