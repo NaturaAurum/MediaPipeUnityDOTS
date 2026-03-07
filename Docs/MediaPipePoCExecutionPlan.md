@@ -238,12 +238,14 @@ The PoC is done when:
 ## Immediate Next Agent Checklist
 
 1. Read `Docs/MediaPipeNativeIntegrationPlan.md`.
-2. Add the MediaPipe submodule and native bridge build path.
-3. Add the Unity Entities package.
-4. Implement native create/destroy smoke test.
-5. Add webcam submit path.
-6. Add result polling path.
-7. Add ECS singleton/buffer path.
-8. Add sample scene and UI Toolkit status panel.
-9. Validate Play Mode stability.
-10. Record findings back into `Docs/`.
+2. Read `Docs/MediaPipePoCImplementationPlan.md` for the current baseline status, verified contracts, and PR split.
+3. Re-run the existing smoke test and capture evidence.
+4. If smoke passes, start a separate PR for Phase 2/3 (`Runtime/Input` + webcam submit + polling snapshot).
+5. Proceed to Phase 4-6 only after Phase 2/3 is stable.
+
+## Current Handoff Note
+
+- The current canonical implementation status lives in `Docs/MediaPipePoCImplementationPlan.md`.
+- Phase 0 baseline recovery is complete there: Entities wiring, local model regeneration, local native plugin regeneration.
+- Phase 1 smoke-test evidence is still pending because batchmode verification was blocked by an already-open Unity instance.
+- The webcam submit slice is intentionally split into a follow-up PR.
