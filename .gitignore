@@ -45,3 +45,9 @@
 # Test and coverage artifacts
 **/TestResults/
 **/coverage/
+
+# Bazel output symlinks (Native/Upstream/mediapipe 내부)
+Native/Upstream/mediapipe/bazel-*
+
+# MediaPipe 모델 바이너리 (용량이 크므로 git에서 제외)
+MediaPipeUnityDOTS/Assets/StreamingAssets/MediaPipe/Models/*.task

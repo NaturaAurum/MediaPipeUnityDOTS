@@ -224,3 +224,10 @@ Rules:
 - Do not optimize the whole graph pipeline yet.
 - First prove the native build and the C ABI shape.
 - Keep every change reproducible from a clean checkout.
+
+## Pinned Upstream
+
+- Repository: https://github.com/google-ai-edge/mediapipe
+- Tag: v0.10.14
+- SHA: `4cf89a70942ca3252e46ace7e4552f53be9bef2e`
+- Submodule path: `Native/Upstream/mediapipe`
