@@ -8,10 +8,9 @@ Unity DOTS (ECS + Jobs) 환경에서 MediaPipe를 성능 우선으로 통합하�
 
 ## Current Status
 
-- GitHub private repository 생성 완료
-- Unity 프로젝트는 하위 폴더 [`MediaPipeUnityDOTS`](./MediaPipeUnityDOTS) 에 위치
-- 현재 Unity 버전: `6000.3.10f1`
-- 아직 MediaPipe 연동 코드는 시작 전이며, 프로젝트 구조와 통합 전략을 먼저 정리하는 단계
+- Unity 버전: `6000.3.10f1`
+- **Phase 1 (Native Bridge) 완료**: macOS Apple Silicon 전용 C ABI bridge 빌드 및 Unity Editor 검증 통과
+- Phase 2 이후 (웹캠 캡처 → ECS 연동 → 시각화) 는 미착수
 
 ## Repository Layout
 
@@ -32,35 +31,77 @@ Unity DOTS (ECS + Jobs) 환경에서 MediaPipe를 성능 우선으로 통합하�
 └── README.md
 ```
 
-현재 저장소 루트는 문서와 네이티브 브리지 소스를 두는 공간으로 보고 있고, 실제 Unity 프로젝트는 별도 하위 폴더에서 관리합니다.
+저장소 루트에 문서와 네이티브 브리지 소스를 두고, Unity 프로젝트는 별도 하위 폴더에서 관리합니다. 구조 상세는 [`Docs/FolderStructure.md`](./Docs/FolderStructure.md) 참고.
+
+## Quick Start
+
+```bash
+# 1. clone + submodule
+git clone --recurse-submodules <repo-url>
+
+# 2. 모델 다운로드
+Native/Build/DownloadModels.sh
+
+# 3. 네이티브 빌드 (macOS Apple Silicon)
+Native/Build/BuildMacosEditor.sh
+
+# 4. dylib → Unity Plugins 복사
+Native/Build/CopyArtifactsToUnity.sh
+
+# 5. Unity Editor에서 프로젝트 열기 → MediaPipe > Run Smoke Test
+```
+
+빌드 상세 및 필수 도구는 [`Native/README.md`](./Native/README.md) 참고.
+
+## Native → Unity 산출물 흐름
+
+```
+Bazel build (Native/Upstream/mediapipe)
+    ↓
+Native/Artifacts/MacosEditor/libmpud_bridge.dylib   ← 빌드 산출물
+    ↓  CopyArtifactsToUnity.sh (install_name 수정 + ad-hoc codesign)
+MediaPipeUnityDOTS/Assets/Plugins/macOS/libmpud_bridge.dylib  ← Unity가 인식하는 위치
+    ↓
+C# DllImport("mpud_bridge")  ← Unity가 lib 접두사와 .dylib 확장자를 자동 해석
+```
+
+| 산출물 | 경로 | git 추적 |
+|--------|------|---------|
+| dylib (빌드 결과) | `Native/Artifacts/MacosEditor/libmpud_bridge.dylib` | ✗ gitignore |
+| dylib (Unity 플러그인) | `Assets/Plugins/macOS/libmpud_bridge.dylib` | ✗ gitignore |
+| dylib .meta | `Assets/Plugins/macOS/libmpud_bridge.dylib.meta` | ✓ 추적 |
+| 모델 파일 | `Assets/StreamingAssets/MediaPipe/Models/hand_landmarker.task` | ✗ gitignore |
+| 모델 .meta | `Assets/StreamingAssets/MediaPipe/Models/hand_landmarker.task.meta` | ✓ 추적 |
+
+> `.dylib`와 `.task`는 용량이 크므로 git에서 제외합니다. clone 후 빌드/다운로드 스크립트로 재생성합니다.
+
+### Unity에서의 플러그인 인식
+
+- `Assets/Plugins/macOS/` 경로에 `.dylib`를 두면 Unity가 macOS 전용 네이티브 플러그인으로 자동 인식합니다.
+- C# 측에서는 `[DllImport("mpud_bridge")]` 로 참조합니다 — Unity가 `lib` 접두사와 `.dylib` 확장자를 플랫폼별로 자동 붙입니다.
+- `CallingConvention.Cdecl`을 명시해야 합니다 (C ABI bridge).
+
+### C# Interop 위치
+
+```
+Assets/MediaPipeUnityDots/Runtime/Interop/
+├── NativeStructs.cs    ← C 구조체 미러 (MpudHandResult, MpudImageFrame 등)
+└── MpudBridge.cs       ← DllImport 선언 (6개 함수)
+```
 
 ## Direction
 
-핵심 목표는 아래 세 가지입니다.
+핵심 목표:
 
 1. MediaPipe 네이티브 그래프 실행은 유지
-2. Unity <-> Native 경계의 복사, 마샬링, GC 비용 최소화
+2. Unity ↔ Native 경계의 복사, 마샬링, GC 비용 최소화
 3. 결과 후처리와 게임플레이 연동은 DOTS 파이프라인으로 구성
 
-예상 구현 축은 다음과 같습니다.
+구현 방식:
 
-- `mediapipe` upstream 기반 네이티브 코어 사용
-- `MediaPipeUnityPlugin` 에서 Unity 연동 노하우는 선별 재사용
-- 얇은 C ABI 브리지 작성
+- MediaPipe upstream 기반 네이티브 코어 + 얇은 C ABI bridge
 - Unity 측에서는 `NativeArray` / unsafe pointer / Jobs 기반 후처리
-- 초기 단계에서는 Unity embedded package 분리 없이, `MediaPipeUnityDOTS` 프로젝트 자체가 `MediaPipeUnityDots` 플러그인과 샘플을 함께 포함
-- `MediaPipeUnityDots` 내부는 우선 `Runtime`, `EditorTool` 두 축으로만 시작
-
-## Next Discussion
-
-다음 단계에서는 폴더 구조를 아래 관점으로 정리할 예정입니다.
-
-- Unity 프로젝트 내부 구조 (`Assets`, `Packages`, `ProjectSettings`)
-- 네이티브 브리지 코드 위치
-- 문서와 설계 산출물 위치
-- PoC 단계와 패키지화 시점의 구조 분리 여부
-
-구조 초안은 [`Docs/FolderStructure.md`](./Docs/FolderStructure.md) 에 정리합니다.
+- `MediaPipeUnityDots` 플러그인과 샘플을 하나의 Unity 프로젝트에 포함 (PoC 단계)
 
 ## Execution Docs
 
