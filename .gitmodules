@@ -1,0 +1,3 @@
+[submodule "Native/Upstream/mediapipe"]
+	path = Native/Upstream/mediapipe
+	url = https://github.com/google-ai-edge/mediapipe.git

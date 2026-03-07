@@ -12,6 +12,7 @@
 **/[Tt]emp/
 **/[Oo]bj/
 **/[Bb]uild/
+!Native/Build/
 **/[Bb]uilds/
 **/[Ll]ogs/
 **/[Uu]ser[Ss]ettings/
@@ -45,3 +46,13 @@
 # Test and coverage artifacts
 **/TestResults/
 **/coverage/
+
+# Bazel output symlinks (Native/Upstream/mediapipe 내부)
+Native/Upstream/mediapipe/bazel-*
+
+# MediaPipe 모델 바이너리 (용량이 크므로 git에서 제외)
+MediaPipeUnityDOTS/Assets/StreamingAssets/MediaPipe/Models/*.task
+
+# 네이티브 빌드 산출물
+Native/Artifacts/MacosEditor/*.dylib
+MediaPipeUnityDOTS/Assets/Plugins/macOS/*.dylib
