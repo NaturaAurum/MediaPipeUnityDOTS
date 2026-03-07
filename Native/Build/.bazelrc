@@ -1,0 +1,13 @@
+# macOS Apple Silicon 기본 설정
+build --cpu=darwin_arm64
+build --apple_platform_type=macos
+build --macos_minimum_os=10.16
+build --define=MEDIAPIPE_DISABLE_GPU=1
+
+# C++17 필수 (MediaPipe 요구사항)
+build --cxxopt=-std=c++17
+build --host_cxxopt=-std=c++17
+
+# 경고 억제, visibility 제어
+build --copt=-w
+build --copt=-fvisibility=hidden
