@@ -2,11 +2,13 @@
   "name": "MediaPipeUnityDotsSamples",
   "rootNamespace": "MediaPipeUnityDotsSamples",
   "references": [
-    "MediaPipeUnityDots.Runtime"
+    "MediaPipeUnityDots.Runtime",
+    "Unity.Collections",
+    "Unity.Entities"
   ],
   "includePlatforms": [],
   "excludePlatforms": [],
-  "allowUnsafeCode": false,
+  "allowUnsafeCode": true,
   "overrideReferences": false,
   "precompiledReferences": [],
   "autoReferenced": true,
