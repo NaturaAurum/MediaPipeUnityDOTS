@@ -29,7 +29,6 @@ Unity DOTS (ECS + Jobs) 환경에서 MediaPipe를 성능 우선으로 통합하�
 │   │   └── Scenes/
 │   ├── Packages/
 │   └── ProjectSettings/
-├── conversation_log_2026-03-01.md
 └── README.md
 ```
 
@@ -62,3 +61,8 @@ Unity DOTS (ECS + Jobs) 환경에서 MediaPipe를 성능 우선으로 통합하�
 - PoC 단계와 패키지화 시점의 구조 분리 여부
 
 구조 초안은 [`Docs/FolderStructure.md`](./Docs/FolderStructure.md) 에 정리합니다.
+
+## Execution Docs
+
+- Native intake and build path: [`Docs/MediaPipeNativeIntegrationPlan.md`](./Docs/MediaPipeNativeIntegrationPlan.md)
+- First implementation slice: [`Docs/MediaPipePoCExecutionPlan.md`](./Docs/MediaPipePoCExecutionPlan.md)

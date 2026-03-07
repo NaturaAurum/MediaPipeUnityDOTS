@@ -17,7 +17,6 @@
 ├── Docs/
 ├── Native/
 ├── MediaPipeUnityDOTS/
-├── conversation_log_2026-03-01.md
 └── README.md
 ```
 
