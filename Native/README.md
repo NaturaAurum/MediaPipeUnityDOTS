@@ -6,7 +6,7 @@ MediaPipe 네이티브 브리지 소스와 빌드 스크립트를 두는 위치�
 
 | 도구 | 설치 | 비고 |
 |------|------|------|
-| [bazelisk](https://github.com/bazelbuild/bazelisk) | `brew install bazelisk` | upstream `.bazelversion` 기준 Bazel 6.1.1 자동 선택 |
+| [bazelisk](https://github.com/bazelbuild/bazelisk) | `brew install bazelisk` | `BuildMacosEditor.sh`가 `Native/Upstream/mediapipe/.bazelversion`을 따라 Bazel 6.1.1인지 확인 후 아니면 즉시 실패 |
 | Xcode Command Line Tools | `xcode-select --install` | clang, ld, libtool 등 |
 | Python 3 + numpy | `python3 -m venv /tmp/mp_build_venv && source /tmp/mp_build_venv/bin/activate && pip install numpy` | MediaPipe 빌드 의존성 |
 | OpenCV 4 | `brew install opencv` | HandLandmarker 런타임 의존성 |
@@ -55,6 +55,7 @@ Native/Build/CopyArtifactsToUnity.sh
 2. C# 코드에서 `[DllImport("mpud_bridge")]`로 참조 — Unity가 플랫폼별로 `lib` 접두사 + `.dylib` 확장자를 자동 해석
 3. `CopyArtifactsToUnity.sh`가 `install_name_tool -id @loader_path/libmpud_bridge.dylib`을 적용하여 Unity의 로딩 경로와 맞춤
 4. macOS Gatekeeper를 위해 `codesign --force -s -` (ad-hoc 서명) 적용
+5. `MediaPipeUnityDOTS/Assets/Plugins/macOS/libmpud_bridge.dylib.meta`에 Editor용 `PluginImporter` 설정을 저장해 fresh import drift를 줄임
 
 ### C# Interop 파일
 
@@ -86,12 +87,12 @@ Unity Editor 메뉴 → **MediaPipe > Run Smoke Test** 실행. Console에 아래
 
 ## macOS 26+ 빌드 워크어라운드
 
-`BuildMacosEditor.sh`는 Bazel 6.1.1 + macOS 26 조합에서 발생하는 문제 두 가지를 자동으로 감지하고 패치합니다:
+`BuildMacosEditor.sh`는 `bazelisk`를 통해 Bazel 6.1.1을 사용하며, 아래 두 가지 보정을 조건부로 적용합니다:
 
-1. **`wrapped_clang` / `libtool_check_unique` LC_UUID 누락** — Bazel 6이 생성하는 toolchain 바이너리에 `LC_UUID`가 없어 macOS 26의 `dyld`가 로딩을 거부합니다. 소스에서 `-Wl,-random_uuid`를 붙여 재컴파일합니다.
-2. **vendored zlib `fdopen` 매크로 충돌** — MediaPipe가 포함하는 zlib의 `zutil.h`에서 `fdopen`을 NULL로 재정의하는 매크로가 SDK 26.2의 `_stdio.h` 선언과 충돌합니다. 해당 매크로를 제거합니다.
+1. **`wrapped_clang` / `libtool_check_unique` LC_UUID 누락** — Bazel 6이 생성한 toolchain 바이너리에 `LC_UUID`가 없을 때만 소스에서 `-Wl,-random_uuid`를 붙여 재컴파일합니다.
+2. **vendored zlib `fdopen` 매크로 충돌** — fetched `zutil.h`에 대상 블록이 존재할 때만 `fdopen` 재정의 블록을 안전하게 치환합니다. 이 보정은 macOS 26 SDK 충돌 대응을 위해 추가되었습니다.
 
-> 이 워크어라운드는 macOS 25 이하에서는 실행되지 않습니다 (바이너리에 이미 LC_UUID가 있으면 skip).
+> 첫 번째 보정은 LC_UUID가 이미 있으면 skip되고, 두 번째 보정은 `zutil.h`에 대상 블록이 없으면 skip됩니다.
 
 ## 디렉토리 구조
 

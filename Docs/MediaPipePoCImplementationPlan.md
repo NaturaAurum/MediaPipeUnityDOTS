@@ -25,8 +25,8 @@ macOS Editor 환경에서 CPU-only single-hand landmark tracking PoC를 완성�
 
 | Phase | 상태 | 메모 |
 |------|------|------|
-| Phase 0 - baseline 복구 | 완료 | Entities 설치, asmdef wiring, model/plugin 재생성 완료 |
-| Phase 1 - smoke test 재검증 | 준비 완료, 증거 미확보 | batchmode 재검증은 열린 Unity 인스턴스 때문에 보류 |
+| Phase 0 - baseline 복구 | 완료 | Entities 설치, asmdef wiring, sample editor asmdef 분리, model/plugin 재생성 완료 |
+| Phase 1 - smoke test 재검증 | 완료 | batchmode smoke test 통과, create/destroy evidence 확보 |
 | Phase 2 - frame submit | 미착수 | 별도 PR로 분리 |
 | Phase 3 - polling/snapshot | 미착수 | Phase 2와 같은 PR 권장 |
 | Phase 4 - ECS runtime path | 미착수 | App/UI bridge push + singleton/dynamic buffer 기준 |
@@ -38,10 +38,14 @@ macOS Editor 환경에서 CPU-only single-hand landmark tracking PoC를 완성�
 - `com.unity.entities`는 `1.3.14`로 설치했고 `MediaPipeUnityDOTS/Packages/packages-lock.json`에 lock됨
 - `MediaPipeUnityDOTS/Assets/MediaPipeUnityDots/Runtime/MediaPipeUnityDots.Runtime.asmdef`에 `Unity.Collections`, `Unity.Entities` 참조를 추가함
 - `MediaPipeUnityDOTS/Assets/MediaPipeUnityDotsSamples/MediaPipeUnityDotsSamples.asmdef`에 `Unity.Collections`, `Unity.Entities` 참조를 추가하고 `allowUnsafeCode`를 `true`로 변경함
+- `MediaPipeUnityDOTS/Assets/MediaPipeUnityDotsSamples/HandTracking/Scripts/Editor/MediaPipeUnityDotsSamples.HandTracking.Editor.asmdef`를 추가해 `NativeSmokeTestRunner.cs`를 editor 전용 assembly로 분리함
 - `MediaPipeUnityDOTS/Assets/StreamingAssets/MediaPipe/Models/hand_landmarker.task`를 로컬에 재생성함
 - `MediaPipeUnityDOTS/Assets/Plugins/macOS/libmpud_bridge.dylib`를 로컬에 재생성함
+- `MediaPipeUnityDOTS/Assets/Plugins/macOS/libmpud_bridge.dylib.meta`에 Editor용 `PluginImporter` 설정을 고정함
 - `Native/Build/BuildMacosEditor.sh`는 macOS 26의 zlib `fdopen` 블록 깨짐을 복구하도록 보강함
+- `Native/Build/BuildMacosEditor.sh`는 `bazelisk`를 통해 `Native/Upstream/mediapipe/.bazelversion`의 Bazel 6.1.1을 강제하고, 일치하지 않으면 즉시 실패하도록 고정함
 - `Native/Build/CopyArtifactsToUnity.sh`는 기존 읽기 전용 dylib overwrite를 위해 `chmod u+w`를 수행함
+- Unity batchmode smoke test가 `NativeSmokeTestRunner.Run` 경로로 통과했고 create/destroy 로그 증거를 확보함
 
 ## 현재 baseline 검증 기록
 
@@ -51,7 +55,7 @@ macOS Editor 환경에서 CPU-only single-hand landmark tracking PoC를 완성�
 |------|------|
 | MediaPipe submodule | `4cf89a70942ca3252e46ace7e4552f53be9bef2e (v0.10.14)` |
 | Bazelisk | `1.28.1` |
-| Bazel | `9.0.0` |
+| Bazel (`Native/Upstream/mediapipe` 기준) | `6.1.1` |
 | Python numpy | `2.4.2` |
 | OpenCV | `4.13.0` |
 | Xcode CLT | `/Applications/Xcode.app/Contents/Developer` |
@@ -59,18 +63,33 @@ macOS Editor 환경에서 CPU-only single-hand landmark tracking PoC를 완성�
 ### 타겟 검증 - 통과
 
 - `MediaPipeUnityDOTS/Packages/packages-lock.json`에 `com.unity.entities: 1.3.14` 기록
+- `NativeSmokeTestRunner.cs`는 sample runtime asmdef가 아니라 editor 전용 asmdef에서 컴파일되도록 분리됨
 - `MediaPipeUnityDOTS/Assets/StreamingAssets/MediaPipe/Models/hand_landmarker.task` 존재
 - `Native/Artifacts/MacosEditor/libmpud_bridge.dylib` 존재
 - `MediaPipeUnityDOTS/Assets/Plugins/macOS/libmpud_bridge.dylib` 존재
+- `MediaPipeUnityDOTS/Assets/Plugins/macOS/libmpud_bridge.dylib.meta`에 Editor용 `PluginImporter` 설정 존재
 - copied dylib의 install name이 `@loader_path/libmpud_bridge.dylib`로 고정됨
 - copied dylib에 ad-hoc codesign이 적용됨
 - Bazel target `//mediapipe/mpud_bridge:libmpud_bridge.dylib` 빌드 성공
 
-### 현재 blocker
+### Phase 1 smoke test - 통과
 
-- Unity batchmode compile/smoke test는 같은 프로젝트를 이미 연 Unity 인스턴스 때문에 중단됨
-- 실제 메시지: `It looks like another Unity instance is running with this project open.`
-- 판단: 코드 blocker가 아니라 환경 blocker이며, Phase 1 증거 확보만 다음 검증 단계로 남음
+- 실행 명령:
+  - `"/Applications/Unity/Hub/Editor/6000.3.10f1/Unity.app/Contents/MacOS/Unity" -batchmode -quit -projectPath ".../MediaPipeUnityDOTS" -executeMethod MediaPipeUnityDotsSamples.HandTracking.Editor.NativeSmokeTestRunner.Run -logFile -`
+- 핵심 로그:
+  - `[MPUD Smoke] create_hand_tracker status: 0`
+  - `[MPUD Smoke] destroy_hand_tracker completed`
+  - `[MPUD Smoke] === Smoke Test Complete (no crash) ===`
+  - `Exiting batchmode successfully now!`
+- 검증 결과:
+  - `DllNotFoundException` 없음
+  - plugin import/load, model path, create/destroy 기본 경로가 현재 baseline에서 동작함
+
+### 현재 비차단 관찰 사항
+
+- Unity batchmode 로그에 duplicate assembly 경고가 보이지만 이번 smoke test는 통과함
+- `Unity.Properties.Internals.asmref` 관련 경고가 보이지만 이번 baseline 검증을 막지는 않음
+- `Native/Upstream/mediapipe` dirty 상태는 계속 남으며 build 부산물과 upstream 수정이 혼동되지 않도록 주의가 필요함
 
 ## 구조 불변 규칙
 
@@ -154,7 +173,7 @@ poll -> snapshot copy -> ECS push -> adapter read -> visualizer/presenter 반영
 - `Native/Build/SyncBridgeIntoWorkspace.sh` 특성상 `Native/Upstream/mediapipe` working tree는 dirty 상태로 남을 수 있음
 - 이는 build 부산물로 취급하며, 별도 요청 없이 destructive git 정리를 하지 않음
 
-### Phase 1 - smoke test 재검증 (다음 작업)
+### Phase 1 - smoke test 재검증 (완료)
 
 목표:
 
@@ -168,13 +187,13 @@ poll -> snapshot copy -> ECS push -> adapter read -> visualizer/presenter 반영
 4. 실패 시 triage 범위는 `dylib` load/import settings, model path, bridge config/version mismatch, thread-local error capture로 제한
 5. smoke test 자체를 막는 compile/package/import 오류는 즉시 Phase 0 blocker로 되돌림
 
-검증 기준:
+확보한 증거:
 
 - Console에 `[MPUD Smoke] create_hand_tracker status: 0`
 - Console에 `[MPUD Smoke] destroy_hand_tracker completed`
 - `DllNotFoundException` 없음
 - 실패 경로에서도 `GetLastError()`가 비어 있지 않음
-- Play Mode 3회 반복에서 crash 없음
+- batchmode 종료 로그가 정상적으로 남음
 
 ### Phase 2 - frame submit path (별도 PR)
 
@@ -298,6 +317,6 @@ poll -> snapshot copy -> ECS push -> adapter read -> visualizer/presenter 반영
 
 ## 즉시 다음 액션
 
-1. 현재 열린 Unity project를 닫거나, 열린 Editor에서 직접 `MediaPipe/Run Smoke Test`를 실행해 Phase 1 증거를 확보
-2. 또는 Unity를 닫은 뒤 batchmode로 smoke test를 실행해 자동 검증 증거를 남김
-3. smoke test가 통과하면 별도 PR에서 Phase 2/3 (`Runtime/Input` + webcam submit + polling snapshot) 구현을 시작
+1. 별도 PR에서 Phase 2/3 (`Runtime/Input` + webcam submit + polling snapshot) 구현을 시작
+2. native baseline을 다시 건드릴 때만 `MediaPipe/Run Smoke Test` 또는 batchmode smoke test를 재실행
+3. Phase 2/3이 안정화되면 그 다음 PR에서 ECS runtime path와 sample visualization/UI를 진행

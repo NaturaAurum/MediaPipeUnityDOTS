@@ -4,14 +4,28 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 NATIVE_DIR="$(dirname "$SCRIPT_DIR")"
 UPSTREAM_MP="$NATIVE_DIR/Upstream/mediapipe"
 
+BAZEL_CMD="bazelisk"
+if ! command -v "$BAZEL_CMD" >/dev/null 2>&1; then
+    echo "[Error] '$BAZEL_CMD' not found. Install bazelisk." >&2
+    exit 1
+fi
+
 "$SCRIPT_DIR/SyncBridgeIntoWorkspace.sh"
 
 cd "$UPSTREAM_MP"
 
+read -r EXPECTED_BAZEL_VERSION < .bazelversion
+ACTUAL_BAZEL_VERSION="$($BAZEL_CMD version 2>/dev/null | awk '/Build label:/ { print $3; exit }')"
+if [ -z "$ACTUAL_BAZEL_VERSION" ] || [ "$ACTUAL_BAZEL_VERSION" != "$EXPECTED_BAZEL_VERSION" ]; then
+    echo "[Error] bazelisk resolved Bazel '$ACTUAL_BAZEL_VERSION' but expected '$EXPECTED_BAZEL_VERSION'." >&2
+    exit 1
+fi
+echo "[Build] Using bazelisk -> Bazel $ACTUAL_BAZEL_VERSION"
+
 # --- macOS 26+ 호환: Bazel 6 toolchain 바이너리에 LC_UUID 주입 ---
 fix_bazel_toolchain_uuid() {
     local BAZEL_OUTPUT
-    BAZEL_OUTPUT="$(bazel --bazelrc="$SCRIPT_DIR/.bazelrc" info output_base 2>/dev/null || true)"
+    BAZEL_OUTPUT="$("$BAZEL_CMD" --bazelrc="$SCRIPT_DIR/.bazelrc" info output_base 2>/dev/null || true)"
     if [ -z "$BAZEL_OUTPUT" ]; then
         return
     fi
@@ -22,7 +36,7 @@ fix_bazel_toolchain_uuid() {
 
     if [ -f "$WRAPPED" ] && ! otool -l "$WRAPPED" 2>/dev/null | grep -q "LC_UUID"; then
         local INSTALL_DIR
-        INSTALL_DIR="$(bazel --bazelrc="$SCRIPT_DIR/.bazelrc" info install_base 2>/dev/null || true)"
+        INSTALL_DIR="$("$BAZEL_CMD" --bazelrc="$SCRIPT_DIR/.bazelrc" info install_base 2>/dev/null || true)"
         local WRAPPED_SRC="$INSTALL_DIR/embedded_tools/tools/osx/crosstool/wrapped_clang.cc"
         local LIBTOOL_SRC="$INSTALL_DIR/embedded_tools/tools/objc/libtool_check_unique.cc"
 
@@ -42,7 +56,7 @@ fix_bazel_toolchain_uuid() {
 # --- macOS 26+ 호환: vendored zlib fdopen 매크로 충돌 수정 ---
 fix_zlib_fdopen() {
     local BAZEL_OUTPUT
-    BAZEL_OUTPUT="$(bazel --bazelrc="$SCRIPT_DIR/.bazelrc" info output_base 2>/dev/null || true)"
+    BAZEL_OUTPUT="$("$BAZEL_CMD" --bazelrc="$SCRIPT_DIR/.bazelrc" info output_base 2>/dev/null || true)"
     if [ -z "$BAZEL_OUTPUT" ]; then
         return
     fi
@@ -107,17 +121,17 @@ PY
 
 # fetch → toolchain 바이너리 생성 → 패치
 echo "[Build] Fetching dependencies..."
-bazel --bazelrc="$SCRIPT_DIR/.bazelrc" fetch \
+"$BAZEL_CMD" --bazelrc="$SCRIPT_DIR/.bazelrc" fetch \
     //mediapipe/mpud_bridge:libmpud_bridge.dylib 2>/dev/null || true
 
 fix_bazel_toolchain_uuid
 fix_zlib_fdopen
 
 echo "[Build] Building libmpud_bridge.dylib..."
-bazel --bazelrc="$SCRIPT_DIR/.bazelrc" build -c opt \
+"$BAZEL_CMD" --bazelrc="$SCRIPT_DIR/.bazelrc" build -c opt \
     //mediapipe/mpud_bridge:libmpud_bridge.dylib
 
-BAZEL_BIN="$(bazel --bazelrc="$SCRIPT_DIR/.bazelrc" info -c opt bazel-bin)"
+BAZEL_BIN="$("$BAZEL_CMD" --bazelrc="$SCRIPT_DIR/.bazelrc" info -c opt bazel-bin)"
 mkdir -p "$NATIVE_DIR/Artifacts/MacosEditor"
 if [ -f "$NATIVE_DIR/Artifacts/MacosEditor/libmpud_bridge.dylib" ]; then
     chmod u+w "$NATIVE_DIR/Artifacts/MacosEditor/libmpud_bridge.dylib"

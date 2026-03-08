@@ -239,13 +239,13 @@ The PoC is done when:
 
 1. Read `Docs/MediaPipeNativeIntegrationPlan.md`.
 2. Read `Docs/MediaPipePoCImplementationPlan.md` for the current baseline status, verified contracts, and PR split.
-3. Re-run the existing smoke test and capture evidence.
-4. If smoke passes, start a separate PR for Phase 2/3 (`Runtime/Input` + webcam submit + polling snapshot).
+3. Start a separate PR for Phase 2/3 (`Runtime/Input` + webcam submit + polling snapshot).
+4. Re-run the smoke test only if the native baseline changes.
 5. Proceed to Phase 4-6 only after Phase 2/3 is stable.
 
 ## Current Handoff Note
 
 - The current canonical implementation status lives in `Docs/MediaPipePoCImplementationPlan.md`.
 - Phase 0 baseline recovery is complete there: Entities wiring, local model regeneration, local native plugin regeneration.
-- Phase 1 smoke-test evidence is still pending because batchmode verification was blocked by an already-open Unity instance.
+- Phase 1 smoke-test evidence is already captured there via batchmode create/destroy verification.
 - The webcam submit slice is intentionally split into a follow-up PR.
