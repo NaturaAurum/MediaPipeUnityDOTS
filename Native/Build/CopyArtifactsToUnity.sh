@@ -14,6 +14,9 @@ if [ ! -f "$SRC" ]; then
 fi
 
 mkdir -p "$DEST_DIR"
+if [ -f "$DEST" ]; then
+    chmod u+w "$DEST"
+fi
 cp "$SRC" "$DEST"
 
 install_name_tool -id "@loader_path/libmpud_bridge.dylib" "$DEST"
