@@ -10,12 +10,62 @@ if ! command -v "$BAZEL_CMD" >/dev/null 2>&1; then
     exit 1
 fi
 
+DISTDIR_ROOT="${TMPDIR:-/tmp}"
+DISTDIR_ROOT="${DISTDIR_ROOT%/}"
+DISTDIR="$DISTDIR_ROOT/mediapipe-unity-bazel-distdir"
+mkdir -p "$DISTDIR"
+
+download_distdir_archive() {
+    local file_name="$1"
+    local url="$2"
+    local expected_sha="$3"
+    local dest="$DISTDIR/$file_name"
+    local actual_sha=""
+
+    if [ -f "$dest" ]; then
+        actual_sha="$(shasum -a 256 "$dest" | awk '{ print $1 }')"
+        if [ "$actual_sha" = "$expected_sha" ]; then
+            echo "[Cache] Using distdir archive: $file_name"
+            return
+        fi
+
+        echo "[Cache] Removing stale distdir archive: $file_name"
+        rm -f "$dest"
+    fi
+
+    echo "[Fetch] Downloading $file_name into distdir"
+    curl -fL --retry 5 --retry-delay 5 --retry-all-errors "$url" -o "$dest.tmp"
+    actual_sha="$(shasum -a 256 "$dest.tmp" | awk '{ print $1 }')"
+    if [ "$actual_sha" != "$expected_sha" ]; then
+        echo "[Error] SHA256 mismatch for $file_name" >&2
+        echo "        expected: $expected_sha" >&2
+        echo "        actual:   $actual_sha" >&2
+        rm -f "$dest.tmp"
+        exit 1
+    fi
+
+    mv "$dest.tmp" "$dest"
+}
+
+download_distdir_archive \
+    "0.9.0.tar.gz" \
+    "https://github.com/bazelbuild/rules_foreign_cc/archive/refs/tags/0.9.0.tar.gz" \
+    "2a4d07cd64b0719b39a7c12218a3e507672b82a97b98c6a89d38565894cf7c51"
+
+download_distdir_archive \
+    "5.3.0-21.7.tar.gz" \
+    "https://github.com/bazelbuild/rules_proto/archive/refs/tags/5.3.0-21.7.tar.gz" \
+    "dc3fb206a2cb3441b485eb1e423165b231235a1ea9b031b4433cf7bc1fa460dd"
+
+BAZEL_STARTUP_FLAGS=(--bazelrc="$SCRIPT_DIR/.bazelrc")
+BAZEL_FETCH_FLAGS=(--distdir="$DISTDIR")
+
 "$SCRIPT_DIR/SyncBridgeIntoWorkspace.sh"
 
 cd "$UPSTREAM_MP"
 
 read -r EXPECTED_BAZEL_VERSION < .bazelversion
-ACTUAL_BAZEL_VERSION="$($BAZEL_CMD version 2>/dev/null | awk '/Build label:/ { print $3; exit }')"
+ACTUAL_BAZEL_VERSION="$($BAZEL_CMD "${BAZEL_STARTUP_FLAGS[@]}" version 2>/dev/null | awk '/Build label:/ { print $3; exit }')"
 if [ -z "$ACTUAL_BAZEL_VERSION" ] || [ "$ACTUAL_BAZEL_VERSION" != "$EXPECTED_BAZEL_VERSION" ]; then
     echo "[Error] bazelisk resolved Bazel '$ACTUAL_BAZEL_VERSION' but expected '$EXPECTED_BAZEL_VERSION'." >&2
     exit 1
@@ -25,7 +75,7 @@ echo "[Build] Using bazelisk -> Bazel $ACTUAL_BAZEL_VERSION"
 # --- macOS 26+ 호환: Bazel 6 toolchain 바이너리에 LC_UUID 주입 ---
 fix_bazel_toolchain_uuid() {
     local BAZEL_OUTPUT
-    BAZEL_OUTPUT="$("$BAZEL_CMD" --bazelrc="$SCRIPT_DIR/.bazelrc" info output_base 2>/dev/null || true)"
+    BAZEL_OUTPUT="$("$BAZEL_CMD" "${BAZEL_STARTUP_FLAGS[@]}" info output_base 2>/dev/null || true)"
     if [ -z "$BAZEL_OUTPUT" ]; then
         return
     fi
@@ -36,7 +86,7 @@ fix_bazel_toolchain_uuid() {
 
     if [ -f "$WRAPPED" ] && ! otool -l "$WRAPPED" 2>/dev/null | grep -q "LC_UUID"; then
         local INSTALL_DIR
-        INSTALL_DIR="$("$BAZEL_CMD" --bazelrc="$SCRIPT_DIR/.bazelrc" info install_base 2>/dev/null || true)"
+        INSTALL_DIR="$("$BAZEL_CMD" "${BAZEL_STARTUP_FLAGS[@]}" info install_base 2>/dev/null || true)"
         local WRAPPED_SRC="$INSTALL_DIR/embedded_tools/tools/osx/crosstool/wrapped_clang.cc"
         local LIBTOOL_SRC="$INSTALL_DIR/embedded_tools/tools/objc/libtool_check_unique.cc"
 
@@ -56,7 +106,7 @@ fix_bazel_toolchain_uuid() {
 # --- macOS 26+ 호환: vendored zlib fdopen 매크로 충돌 수정 ---
 fix_zlib_fdopen() {
     local BAZEL_OUTPUT
-    BAZEL_OUTPUT="$("$BAZEL_CMD" --bazelrc="$SCRIPT_DIR/.bazelrc" info output_base 2>/dev/null || true)"
+    BAZEL_OUTPUT="$("$BAZEL_CMD" "${BAZEL_STARTUP_FLAGS[@]}" info output_base 2>/dev/null || true)"
     if [ -z "$BAZEL_OUTPUT" ]; then
         return
     fi
@@ -121,17 +171,17 @@ PY
 
 # fetch → toolchain 바이너리 생성 → 패치
 echo "[Build] Fetching dependencies..."
-"$BAZEL_CMD" --bazelrc="$SCRIPT_DIR/.bazelrc" fetch \
+"$BAZEL_CMD" "${BAZEL_STARTUP_FLAGS[@]}" fetch "${BAZEL_FETCH_FLAGS[@]}" \
     //mediapipe/mpud_bridge:libmpud_bridge.dylib 2>/dev/null || true
 
 fix_bazel_toolchain_uuid
 fix_zlib_fdopen
 
 echo "[Build] Building libmpud_bridge.dylib..."
-"$BAZEL_CMD" --bazelrc="$SCRIPT_DIR/.bazelrc" build -c opt \
+"$BAZEL_CMD" "${BAZEL_STARTUP_FLAGS[@]}" build "${BAZEL_FETCH_FLAGS[@]}" -c opt \
     //mediapipe/mpud_bridge:libmpud_bridge.dylib
 
-BAZEL_BIN="$("$BAZEL_CMD" --bazelrc="$SCRIPT_DIR/.bazelrc" info -c opt bazel-bin)"
+BAZEL_BIN="$("$BAZEL_CMD" "${BAZEL_STARTUP_FLAGS[@]}" info -c opt bazel-bin)"
 mkdir -p "$NATIVE_DIR/Artifacts/MacosEditor"
 if [ -f "$NATIVE_DIR/Artifacts/MacosEditor/libmpud_bridge.dylib" ]; then
     chmod u+w "$NATIVE_DIR/Artifacts/MacosEditor/libmpud_bridge.dylib"
