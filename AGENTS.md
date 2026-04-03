@@ -15,7 +15,7 @@
 
 ## Tech Stack
 
-- **Unity**: 6000.3.10f1 (`MediaPipeUnityDOTS/ProjectSettings/ProjectVersion.txt`)
+- **Unity**: 6000.3.11f1 (`MediaPipeUnityDOTS/ProjectSettings/ProjectVersion.txt`)
 - **Scene**: `MediaPipeUnityDOTS/Assets/Scenes/SampleScene.unity`
 - **Lang**: C# (unsafe allowed when needed for interop)
 - **UI**: UI Toolkit for new UI work
@@ -60,6 +60,9 @@
 - **Targeted First**: Prefer narrow checks (`-testFilter`) before full EditMode run.
 - **Failure Rule**: If check fails, do not add new features. Fix failure or rollback the last change.
 - **Done Rule**: A task is complete only when success criterion is satisfied by evidence.
+
+## uni-cli
+- can use uni-cli for control unity editor on command line
 
 ## AGENTS.md Incremental Improvement Rule
 

@@ -65,13 +65,13 @@ MediaPipeUnityDOTS/Assets/Plugins/macOS/libmpud_bridge.dylib  ← Unity가 인�
 C# DllImport("mpud_bridge")  ← Unity가 lib 접두사와 .dylib 확장자를 자동 해석
 ```
 
-| 산출물 | 경로 | git 추적 |
-|--------|------|---------|
-| dylib (빌드 결과) | `Native/Artifacts/MacosEditor/libmpud_bridge.dylib` | ✗ gitignore |
-| dylib (Unity 플러그인) | `Assets/Plugins/macOS/libmpud_bridge.dylib` | ✗ gitignore |
-| dylib .meta | `Assets/Plugins/macOS/libmpud_bridge.dylib.meta` | ✓ 추적 |
-| 모델 파일 | `Assets/StreamingAssets/MediaPipe/Models/hand_landmarker.task` | ✗ gitignore |
-| 모델 .meta | `Assets/StreamingAssets/MediaPipe/Models/hand_landmarker.task.meta` | ✓ 추적 |
+| 산출물                 | 경로                                                                | git 추적    |
+| ---------------------- | ------------------------------------------------------------------- | ----------- |
+| dylib (빌드 결과)      | `Native/Artifacts/MacosEditor/libmpud_bridge.dylib`                 | ✗ gitignore |
+| dylib (Unity 플러그인) | `Assets/Plugins/macOS/libmpud_bridge.dylib`                         | ✗ gitignore |
+| dylib .meta            | `Assets/Plugins/macOS/libmpud_bridge.dylib.meta`                    | ✓ 추적      |
+| 모델 파일              | `Assets/StreamingAssets/MediaPipe/Models/hand_landmarker.task`      | ✗ gitignore |
+| 모델 .meta             | `Assets/StreamingAssets/MediaPipe/Models/hand_landmarker.task.meta` | ✓ 추적      |
 
 > `.dylib`와 `.task`는 용량이 크므로 git에서 제외합니다. clone 후 빌드/다운로드 스크립트로 재생성합니다.
 
