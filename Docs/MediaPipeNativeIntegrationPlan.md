@@ -228,6 +228,6 @@ Rules:
 ## Pinned Upstream
 
 - Repository: https://github.com/google-ai-edge/mediapipe
-- Tag: v0.10.14
-- SHA: `4cf89a70942ca3252e46ace7e4552f53be9bef2e`
+- Tag: v0.10.33
+- SHA: `3987048d4b390aa9ae675c796f6421bbeece6511`
 - Submodule path: `Native/Upstream/mediapipe`

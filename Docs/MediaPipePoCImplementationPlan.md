@@ -39,13 +39,17 @@ macOS Editor 환경에서 CPU-only single-hand landmark tracking PoC를 완성�
 - `MediaPipeUnityDOTS/Assets/MediaPipeUnityDots/Runtime/MediaPipeUnityDots.Runtime.asmdef`에 `Unity.Collections`, `Unity.Entities` 참조를 추가함
 - `MediaPipeUnityDOTS/Assets/MediaPipeUnityDotsSamples/MediaPipeUnityDotsSamples.asmdef`에 `Unity.Collections`, `Unity.Entities` 참조를 추가하고 `allowUnsafeCode`를 `true`로 변경함
 - `MediaPipeUnityDOTS/Assets/MediaPipeUnityDotsSamples/HandTracking/Scripts/Editor/MediaPipeUnityDotsSamples.HandTracking.Editor.asmdef`를 추가해 `NativeSmokeTestRunner.cs`를 editor 전용 assembly로 분리함
+- `Native/Upstream/mediapipe` submodule을 `v0.10.33`으로 올림
 - `MediaPipeUnityDOTS/Assets/StreamingAssets/MediaPipe/Models/hand_landmarker.task`를 로컬에 재생성함
 - `MediaPipeUnityDOTS/Assets/Plugins/macOS/libmpud_bridge.dylib`를 로컬에 재생성함
 - `MediaPipeUnityDOTS/Assets/Plugins/macOS/libmpud_bridge.dylib.meta`에 Editor용 `PluginImporter` 설정을 고정함
+- `Native/Build/.bazelrc`를 MediaPipe v0.10.33 요구사항에 맞춰 C++20으로 상향함
 - `Native/Build/BuildMacosEditor.sh`는 macOS 26의 zlib `fdopen` 블록 깨짐을 복구하도록 보강함
-- `Native/Build/BuildMacosEditor.sh`는 `bazelisk`를 통해 `Native/Upstream/mediapipe/.bazelversion`의 Bazel 6.1.1을 강제하고, 일치하지 않으면 즉시 실패하도록 고정함
+- `Native/Build/BuildMacosEditor.sh`는 `bazelisk`를 통해 `Native/Upstream/mediapipe/.bazelversion`의 Bazel 7.4.1을 강제하고, `HERMETIC_PYTHON_VERSION=3.12`를 기본값으로 사용하도록 고정함
+- `Native/Patches/mediapipe/macos_arm64_compat.diff`를 v0.10.33 기준으로 재작성함
+- `Native/Patches/mediapipe/tasks_logging_analytics_compat.diff`를 추가해 공개 OSS 태그에 없는 `mediapipe/util/analytics` 의존성을 제거함
 - `Native/Build/CopyArtifactsToUnity.sh`는 기존 읽기 전용 dylib overwrite를 위해 `chmod u+w`를 수행함
-- Unity batchmode smoke test가 `NativeSmokeTestRunner.Run` 경로로 통과했고 create/destroy 로그 증거를 확보함
+- 2026-04-03 기준 Unity 실행 중 인스턴스에서 `MediaPipe/Run Smoke Test` 메뉴를 재실행했고 create/destroy 로그 증거를 다시 확보함
 
 ## 현재 baseline 검증 기록
 
@@ -53,9 +57,9 @@ macOS Editor 환경에서 CPU-only single-hand landmark tracking PoC를 완성�
 
 | 항목 | 결과 |
 |------|------|
-| MediaPipe submodule | `4cf89a70942ca3252e46ace7e4552f53be9bef2e (v0.10.14)` |
+| MediaPipe submodule | `3987048d4b390aa9ae675c796f6421bbeece6511 (v0.10.33)` |
 | Bazelisk | `1.28.1` |
-| Bazel (`Native/Upstream/mediapipe` 기준) | `6.1.1` |
+| Bazel (`Native/Upstream/mediapipe` 기준) | `7.4.1` |
 | Python numpy | `2.4.2` |
 | OpenCV | `4.13.0` |
 | Xcode CLT | `/Applications/Xcode.app/Contents/Developer` |
@@ -74,21 +78,23 @@ macOS Editor 환경에서 CPU-only single-hand landmark tracking PoC를 완성�
 
 ### Phase 1 smoke test - 통과
 
-- 실행 명령:
-  - `"/Applications/Unity/Hub/Editor/6000.3.10f1/Unity.app/Contents/MacOS/Unity" -batchmode -quit -projectPath ".../MediaPipeUnityDOTS" -executeMethod MediaPipeUnityDotsSamples.HandTracking.Editor.NativeSmokeTestRunner.Run -logFile -`
+- 2026-04-03 실행 방식:
+  - 이미 열려 있던 Unity 6000.4.1f1 인스턴스에서 `MediaPipe/Run Smoke Test` 메뉴를 MCP `execute_menu_item`으로 실행
 - 핵심 로그:
   - `[MPUD Smoke] create_hand_tracker status: 0`
+  - `[MPUD Smoke] Tracker created successfully!`
   - `[MPUD Smoke] destroy_hand_tracker completed`
   - `[MPUD Smoke] === Smoke Test Complete (no crash) ===`
-  - `Exiting batchmode successfully now!`
 - 검증 결과:
   - `DllNotFoundException` 없음
   - plugin import/load, model path, create/destroy 기본 경로가 현재 baseline에서 동작함
+  - 같은 프로젝트가 이미 열려 있어 별도 batchmode 실행은 Unity가 차단했으며, open-editor smoke 경로로 대체 검증함
 
 ### 현재 비차단 관찰 사항
 
 - Unity batchmode 로그에 duplicate assembly 경고가 보이지만 이번 smoke test는 통과함
 - `Unity.Properties.Internals.asmref` 관련 경고가 보이지만 이번 baseline 검증을 막지는 않음
+- `libmpud_bridge.dylib` 링크 시 OpenCV dylib들이 macOS 26.0 타깃으로 빌드되었다는 경고가 남지만 현재 Editor smoke test는 통과함
 - `Native/Upstream/mediapipe` dirty 상태는 계속 남으며 build 부산물과 upstream 수정이 혼동되지 않도록 주의가 필요함
 
 ## 구조 불변 규칙

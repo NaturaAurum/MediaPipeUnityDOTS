@@ -6,9 +6,9 @@ build --apple_platform_type=macos
 build --macos_minimum_os=10.16
 build --define=MEDIAPIPE_DISABLE_GPU=1
 
-# C++17 필수 (MediaPipe 요구사항)
-build --cxxopt=-std=c++17
-build --host_cxxopt=-std=c++17
+# MediaPipe v0.10.33의 api3/node는 consteval을 사용하므로 C++20 필요
+build --cxxopt=-std=c++20
+build --host_cxxopt=-std=c++20
 
 # 경고 억제, visibility 제어
 build --copt=-w

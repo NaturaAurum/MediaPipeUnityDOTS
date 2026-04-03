@@ -10,6 +10,11 @@ if ! command -v "$BAZEL_CMD" >/dev/null 2>&1; then
     exit 1
 fi
 
+# MediaPipe v0.10.33는 3.9~3.12 requirements lock만 제공한다.
+# 로컬 기본 python3가 3.14여도 hermetic Python은 3.12로 고정한다.
+: "${HERMETIC_PYTHON_VERSION:=3.12}"
+export HERMETIC_PYTHON_VERSION
+
 DISTDIR_ROOT="${TMPDIR:-/tmp}"
 DISTDIR_ROOT="${DISTDIR_ROOT%/}"
 DISTDIR="$DISTDIR_ROOT/mediapipe-unity-bazel-distdir"
@@ -48,14 +53,19 @@ download_distdir_archive() {
 }
 
 download_distdir_archive \
-    "0.9.0.tar.gz" \
-    "https://github.com/bazelbuild/rules_foreign_cc/archive/refs/tags/0.9.0.tar.gz" \
-    "2a4d07cd64b0719b39a7c12218a3e507672b82a97b98c6a89d38565894cf7c51"
+    "rules_cc-0.1.4.tar.gz" \
+    "https://github.com/bazelbuild/rules_cc/releases/download/0.1.4/rules_cc-0.1.4.tar.gz" \
+    "0d3b4f984c4c2e1acfd1378e0148d35caf2ef1d9eb95b688f8e19ce0c41bdf5b"
 
 download_distdir_archive \
-    "5.3.0-21.7.tar.gz" \
-    "https://github.com/bazelbuild/rules_proto/archive/refs/tags/5.3.0-21.7.tar.gz" \
-    "dc3fb206a2cb3441b485eb1e423165b231235a1ea9b031b4433cf7bc1fa460dd"
+    "rules_foreign_cc-0.12.0.tar.gz" \
+    "https://github.com/bazelbuild/rules_foreign_cc/releases/download/0.12.0/rules_foreign_cc-0.12.0.tar.gz" \
+    "a2e6fb56e649c1ee79703e99aa0c9d13c6cc53c8d7a0cbb8797ab2888bbc99a3"
+
+download_distdir_archive \
+    "rules_proto_grpc-4.2.0.tar.gz" \
+    "https://github.com/rules-proto-grpc/rules_proto_grpc/archive/4.2.0.tar.gz" \
+    "bbe4db93499f5c9414926e46f9e35016999a4e9f6e3522482d3760dc61011070"
 
 BAZEL_STARTUP_FLAGS=(--bazelrc="$SCRIPT_DIR/.bazelrc")
 BAZEL_FETCH_FLAGS=(--distdir="$DISTDIR")

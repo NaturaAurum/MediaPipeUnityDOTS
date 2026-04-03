@@ -6,15 +6,15 @@ MediaPipe 네이티브 브리지 소스와 빌드 스크립트를 두는 위치�
 
 | 도구 | 설치 | 비고 |
 |------|------|------|
-| [bazelisk](https://github.com/bazelbuild/bazelisk) | `brew install bazelisk` | `BuildMacosEditor.sh`가 `Native/Upstream/mediapipe/.bazelversion`을 따라 Bazel 6.1.1인지 확인 후 아니면 즉시 실패 |
+| [bazelisk](https://github.com/bazelbuild/bazelisk) | `brew install bazelisk` | `BuildMacosEditor.sh`가 `Native/Upstream/mediapipe/.bazelversion`을 따라 현재 요구 Bazel 7.4.1인지 확인 후 아니면 즉시 실패 |
 | Xcode Command Line Tools | `xcode-select --install` | clang, ld, libtool 등 |
-| Python 3 + numpy | `python3 -m venv /tmp/mp_build_venv && source /tmp/mp_build_venv/bin/activate && pip install numpy` | MediaPipe 빌드 의존성 |
+| Python 3.12 + numpy | `python3.12 -m venv /tmp/mp_build_venv && source /tmp/mp_build_venv/bin/activate && pip install numpy` | `BuildMacosEditor.sh`가 `HERMETIC_PYTHON_VERSION=3.12`를 기본값으로 사용 |
 | OpenCV 4 | `brew install opencv` | HandLandmarker 런타임 의존성 |
 
 ## Upstream
 
 - `Native/Upstream/mediapipe/`: google-ai-edge/mediapipe git submodule
-- Pinned tag: **v0.10.14** (SHA: `4cf89a70942ca3252e46ace7e4552f53be9bef2e`)
+- Pinned tag: **v0.10.33** (SHA: `3987048d4b390aa9ae675c796f6421bbeece6511`)
 
 ## 빌드 순서
 
@@ -78,28 +78,29 @@ Unity Editor 메뉴 → **MediaPipe > Run Smoke Test** 실행. Console에 아래
 
 ## 패치 파일
 
-`Native/Patches/mediapipe/` 아래 두 개의 패치가 있으며, `SyncBridgeIntoWorkspace.sh`가 빌드 시 자동 적용합니다.
+`Native/Patches/mediapipe/` 아래 패치들이 있으며, `SyncBridgeIntoWorkspace.sh`가 빌드 시 자동 적용합니다.
 
 | 패치 | 대상 | 역할 |
 |------|------|------|
-| `visibility.diff` | 9개 upstream BUILD 파일 | `cc_library` visibility를 `public`으로 변경 (bridge 빌드에 필요) |
-| `macos_arm64_compat.diff` | WORKSPACE, opencv_macos.BUILD | Apple Silicon Homebrew 경로 + OpenCV 4 + `rules_cc` sha256 |
+| `macos_arm64_compat.diff` | WORKSPACE, `opencv_macos.BUILD` | Apple Silicon Homebrew 경로 + OpenCV 4 include/layout 반영 |
+| `tasks_logging_analytics_compat.diff` | `tasks/cc/core/*`, `tasks/cc/core/logging/*` | 공개 OSS 태그에 없는 `mediapipe/util/analytics` 의존성을 제거하여 Hand Landmarker 빌드 복구 |
 
 ## macOS 26+ 빌드 워크어라운드
 
-`BuildMacosEditor.sh`는 `bazelisk`를 통해 Bazel 6.1.1을 사용하며, 아래 두 가지 보정을 조건부로 적용합니다:
+`BuildMacosEditor.sh`는 `bazelisk`를 통해 Bazel 7.4.1을 사용하며, 아래 보정을 조건부로 적용합니다:
 
-1. **`wrapped_clang` / `libtool_check_unique` LC_UUID 누락** — Bazel 6이 생성한 toolchain 바이너리에 `LC_UUID`가 없을 때만 소스에서 `-Wl,-random_uuid`를 붙여 재컴파일합니다.
-2. **vendored zlib `fdopen` 매크로 충돌** — fetched `zutil.h`에 대상 블록이 존재할 때만 `fdopen` 재정의 블록을 안전하게 치환합니다. 이 보정은 macOS 26 SDK 충돌 대응을 위해 추가되었습니다.
+1. **Hermetic Python 3.12 기본값** — 로컬 기본 `python3`가 3.14 이상이어도 `HERMETIC_PYTHON_VERSION=3.12`를 기본 적용해 MediaPipe의 requirements lock과 맞춥니다.
+2. **`wrapped_clang` / `libtool_check_unique` LC_UUID 누락** — Bazel toolchain 바이너리에 `LC_UUID`가 없을 때만 소스에서 `-Wl,-random_uuid`를 붙여 재컴파일합니다.
+3. **vendored zlib `fdopen` 매크로 충돌** — fetched `zutil.h`에 대상 블록이 존재할 때만 `fdopen` 재정의 블록을 안전하게 치환합니다. 이 보정은 macOS 26 SDK 충돌 대응을 위해 추가되었습니다.
 
-> 첫 번째 보정은 LC_UUID가 이미 있으면 skip되고, 두 번째 보정은 `zutil.h`에 대상 블록이 없으면 skip됩니다.
+> LC_UUID 보정은 이미 UUID가 있으면 skip되고, zlib 보정은 `zutil.h`에 대상 블록이 없으면 skip됩니다.
 
 ## 디렉토리 구조
 
 ```
 Native/
 ├── Upstream/
-│   └── mediapipe/          # git submodule (v0.10.14)
+│   └── mediapipe/          # git submodule (v0.10.33)
 ├── Bridge/
 │   ├── Include/            # C ABI 헤더 (mpud_bridge.h)
 │   ├── Src/                # C++ 구현 (mpud_bridge.cc)
@@ -112,8 +113,8 @@ Native/
 │   └── DownloadModels.sh
 ├── Patches/
 │   └── mediapipe/
-│       ├── visibility.diff
-│       └── macos_arm64_compat.diff
+│       ├── macos_arm64_compat.diff
+│       └── tasks_logging_analytics_compat.diff
 └── Artifacts/
     └── MacosEditor/        # 빌드 산출물 (.dylib)
 ```
