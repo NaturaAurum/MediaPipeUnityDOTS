@@ -10,9 +10,9 @@ if ! command -v "$BAZEL_CMD" >/dev/null 2>&1; then
     exit 1
 fi
 
-# MediaPipe v0.10.33는 3.9~3.12 requirements lock만 제공한다.
-# 로컬 기본 python3가 3.14여도 hermetic Python은 3.12로 고정한다.
-: "${HERMETIC_PYTHON_VERSION:=3.12}"
+# MediaPipe v1.0.0은 MODULE.bazel에서 python 3.11 toolchain을 사용한다.
+# 로컬 기본 python3가 3.14여도 hermetic Python은 3.11로 고정한다.
+: "${HERMETIC_PYTHON_VERSION:=3.11}"
 export HERMETIC_PYTHON_VERSION
 
 DISTDIR_ROOT="${TMPDIR:-/tmp}"

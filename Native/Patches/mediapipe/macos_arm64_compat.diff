@@ -9,7 +9,7 @@ index afd7555..f2e9373 100644
 -    path = "/usr/local",  # e.g. /usr/local/Cellar for HomeBrew
 +    path = "/opt/homebrew",  # Apple Silicon Homebrew
  )
- 
+
  new_local_repository(
 diff --git a/third_party/opencv_macos.BUILD b/third_party/opencv_macos.BUILD
 index 4139f18..7d27b09 100644
@@ -18,10 +18,10 @@ index 4139f18..7d27b09 100644
 @@ -35,7 +35,7 @@ exports_files(["LICENSE"])
  # "include/opencv4/opencv2/**/*.h*" and the include prefix needs to be set to
  # "include/opencv4".
- 
+
 -PREFIX = "opt/opencv@3"
-+PREFIX = "opt/opencv"
- 
++PREFIX = "opt/opencv@4"
+
  cc_library(
      name = "opencv",
 @@ -51,8 +51,8 @@ cc_library(

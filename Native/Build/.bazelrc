@@ -1,12 +1,14 @@
 # macOS Apple Silicon 기본 설정
+common --enable_bzlmod
 common --experimental_repository_downloader_retries=5
 
+build --repo_env=RULES_PYTHON_IGNORE_ROOT_USER_ERROR=1
 build --cpu=darwin_arm64
 build --apple_platform_type=macos
 build --macos_minimum_os=10.16
 build --define=MEDIAPIPE_DISABLE_GPU=1
 
-# MediaPipe v0.10.33의 api3/node는 consteval을 사용하므로 C++20 필요
+# MediaPipe v1.0.0의 api3/node는 consteval을 사용하므로 C++20 필요
 build --cxxopt=-std=c++20
 build --host_cxxopt=-std=c++20
 
