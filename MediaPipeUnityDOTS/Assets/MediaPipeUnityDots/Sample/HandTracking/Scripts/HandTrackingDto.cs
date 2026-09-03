@@ -1,6 +1,6 @@
 using UnityEngine;
 
-namespace MediaPipeUnityDotsSamples.HandTracking
+namespace MediaPipeUnityDots.Sample.HandTracking.Scripts
 {
     /// <summary>
     /// ECS 싱글턴/버퍼에서 읽어 visualizer와 UI에 전달하는 plain DTO.

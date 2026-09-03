@@ -31,15 +31,13 @@
 
 ## Coding Guidelines
 
-- **Naming**: `PascalCase` (Class/Method/Prop/Const), `camelCase` (Var/Param, SerializeField for serializable types, and all serializable types), `_camelCase` (Private), `IInterface`.
-- **Naming Priority (New/Modified Code Only)**: If a field is both `private` and `[SerializeField]`, use `camelCase` (SerializeField rule takes precedence over generic private-field wording).
-- **Naming Verification**: During review of touched files, confirm every `[SerializeField] private` field name is `camelCase` (no leading `_`).
-- **Format**: 4 spaces indent, LF style.
+- **Naming**: `PascalCase` (Class/Method/Prop/Const), `camelCase` (Var/Param), `_camelCase` (Private), `IInterface`.
+- **Format**: 4 spaces indent, LF style. See `MediaPipeUnityDOTS/.editorconfig` for details.
 - **Patterns**: MVVM for UI/App code, data-oriented design for Unity DOTS / ECS runtime
 - **Structure**:
   - `MediaPipeUnityDOTS/Assets/MediaPipeUnityDots/Runtime/`: Plugin runtime code
   - `MediaPipeUnityDOTS/Assets/MediaPipeUnityDots/EditorTool/`: Editor-side utility code
-  - `MediaPipeUnityDOTS/Assets/MediaPipeUnityDotsSamples/`: Sample and validation code
+  - `MediaPipeUnityDOTS/Assets/MediaPipeUnityDots/Sample/`: Sample and validation code
   - `Native/`: Native bridge source and build scripts
   - `Docs/`: Architecture notes and decisions
 
@@ -60,9 +58,6 @@
 - **Targeted First**: Prefer narrow checks (`-testFilter`) before full EditMode run.
 - **Failure Rule**: If check fails, do not add new features. Fix failure or rollback the last change.
 - **Done Rule**: A task is complete only when success criterion is satisfied by evidence.
-
-## uni-cli
-- can use uni-cli for control unity editor on command line
 
 ## AGENTS.md Incremental Improvement Rule
 

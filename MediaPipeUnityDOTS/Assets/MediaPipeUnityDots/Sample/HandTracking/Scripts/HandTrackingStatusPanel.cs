@@ -1,7 +1,7 @@
 using UnityEngine;
 using UnityEngine.UIElements;
 
-namespace MediaPipeUnityDotsSamples.HandTracking
+namespace MediaPipeUnityDots.Sample.HandTracking.Scripts
 {
     /// <summary>
     /// tracker 상태/프레임/타임스탬프/handedness/confidence를 보여주는 UI Toolkit 패널.
@@ -102,14 +102,11 @@ namespace MediaPipeUnityDotsSamples.HandTracking
             return label;
         }
 
-        private static string HandednessText(int handedness)
+        private static string HandednessText(int handedness) => handedness switch
         {
-            return handedness switch
-            {
-                0 => "Left",
-                1 => "Right",
-                _ => "-",
-            };
-        }
+            0 => "Left",
+            1 => "Right",
+            _ => "-",
+        };
     }
 }

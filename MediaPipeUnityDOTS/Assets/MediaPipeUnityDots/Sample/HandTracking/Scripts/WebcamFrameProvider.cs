@@ -6,7 +6,7 @@ using MediaPipeUnityDots.Runtime.Tracking;
 using Unity.Entities;
 using UnityEngine;
 
-namespace MediaPipeUnityDotsSamples.HandTracking
+namespace MediaPipeUnityDots.Sample.HandTracking.Scripts
 {
     /// <summary>
     /// WebCamTexture로부터 프레임을 캡처하고 HandTrackingService에 제출하는 샘플 프로바이더.
@@ -144,10 +144,7 @@ namespace MediaPipeUnityDotsSamples.HandTracking
             DisposeResources();
         }
 
-        private void OnDestroy()
-        {
-            DisposeResources();
-        }
+        private void OnDestroy() => DisposeResources();
 
         private void InitializeResources()
         {
@@ -293,7 +290,7 @@ namespace MediaPipeUnityDotsSamples.HandTracking
             entityManager = default;
 
             var defaultWorld = World.DefaultGameObjectInjectionWorld;
-            if (defaultWorld == null || !defaultWorld.IsCreated)
+            if (defaultWorld is not { IsCreated: true })
             {
                 _ecsWorld = null;
                 _singletonEntity = Entity.Null;

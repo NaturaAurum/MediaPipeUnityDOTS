@@ -30,14 +30,14 @@ macOS Editor 환경에서 CPU-only single-hand landmark tracking PoC를 완성�
 | Phase 2 - frame submit | 코드 구현됨 | `Runtime/Input` + `WebcamFrameProvider` 존재, Play Mode 실측 남음 |
 | Phase 3 - polling/snapshot | 코드 구현됨 | `Runtime/Tracking` (`HandTrackingService/Snapshot`) 존재, Play Mode 실측 남음 |
 | Phase 4 - ECS runtime path | 코드 구현됨 | singleton + `DynamicBuffer<LandmarkElement>` + read-validation system 존재, Play Mode 실측 남음 |
-| Phase 5 - sample visualization/UI | 코드 구현됨 (Play Mode 미검증) | `HandTrackingAdapter` (DTO) + `HandLandmarkVisualizer` + `HandTrackingStatusPanel` (UI Toolkit) + SampleScene 배선 완료. webcam 실측 남음 |
+| Phase 5 - sample visualization/UI | 코드 구현됨 (Play Mode 미검증) | 렌더는 ECS: `HandLandmarkPoint` 21 엔티티 + `HandLandmarkRenderSystem` (Burst, LocalTransform 기록) + sample `HandLandmarkPointSpawner` (Entities.Graphics `RenderMeshArray`). UI는 `HandTrackingAdapter` (DTO) + `HandTrackingStatusPanel` (UI Toolkit). SampleScene 배선 완료. webcam 실측 남음 |
 
 현재 확정 사항:
 
-- `com.unity.entities`는 `1.3.14`로 설치했고 `MediaPipeUnityDOTS/Packages/packages-lock.json`에 lock됨
+- `com.unity.entities`는 `6.6.0`으로 설치했고 `MediaPipeUnityDOTS/Packages/packages-lock.json`에 lock됨
 - `MediaPipeUnityDOTS/Assets/MediaPipeUnityDots/Runtime/MediaPipeUnityDots.Runtime.asmdef`에 `Unity.Collections`, `Unity.Entities` 참조를 추가함
-- `MediaPipeUnityDOTS/Assets/MediaPipeUnityDotsSamples/MediaPipeUnityDotsSamples.asmdef`에 `Unity.Collections`, `Unity.Entities` 참조를 추가하고 `allowUnsafeCode`를 `true`로 변경함
-- `MediaPipeUnityDOTS/Assets/MediaPipeUnityDotsSamples/HandTracking/Scripts/Editor/MediaPipeUnityDotsSamples.HandTracking.Editor.asmdef`를 추가해 `NativeSmokeTestRunner.cs`를 editor 전용 assembly로 분리함
+- `MediaPipeUnityDOTS/Assets/MediaPipeUnityDots/Sample/MediaPipeUnityDots.Sample.asmdef`에 `Unity.Collections`, `Unity.Entities` 참조를 추가하고 `allowUnsafeCode`를 `true`로 변경함 (구 `MediaPipeUnityDotsSamples`에서 이동)
+- `MediaPipeUnityDOTS/Assets/MediaPipeUnityDots/Sample/HandTracking/Scripts/Editor/MediaPipeUnityDots.Sample.HandTracking.Editor.asmdef`를 추가해 `NativeSmokeTestRunner.cs`를 editor 전용 assembly로 분리함
 - `Native/Upstream/mediapipe` submodule을 `v1.0.0`으로 올림 (`6d31f1ebc3284db74d211d62bdc4f0a0c29ea120`)
 - `MediaPipeUnityDOTS/Assets/StreamingAssets/MediaPipe/Models/hand_landmarker.task`를 로컬에 재생성함
 - `MediaPipeUnityDOTS/Assets/Plugins/macOS/libmpud_bridge.dylib`를 로컬에 재생성함

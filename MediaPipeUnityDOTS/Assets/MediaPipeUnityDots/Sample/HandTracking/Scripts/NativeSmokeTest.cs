@@ -1,16 +1,14 @@
-using UnityEngine;
-using UnityEditor;
-using MediaPipeUnityDots.Runtime.Interop;
 using System;
 using System.Runtime.InteropServices;
 using System.Text;
+using MediaPipeUnityDots.Runtime.Interop;
+using UnityEngine;
 
-namespace MediaPipeUnityDotsSamples.HandTracking.Editor
+namespace MediaPipeUnityDots.Sample.HandTracking.Scripts
 {
-    public static class NativeSmokeTestRunner
+    public class NativeSmokeTest : MonoBehaviour
     {
-        [MenuItem("MediaPipe/Run Smoke Test")]
-        public static void Run()
+        private void Start()
         {
             Debug.Log("[MPUD Smoke] === Native Bridge Smoke Test ===");
 
@@ -20,7 +18,6 @@ namespace MediaPipeUnityDotsSamples.HandTracking.Editor
             var modelPath = System.IO.Path.Combine(
                 Application.streamingAssetsPath,
                 "MediaPipe/Models/hand_landmarker.task");
-            Debug.Log($"[MPUD Smoke] Model path: {modelPath}");
 
             var modelPathNative = MarshalStringToUtf8(modelPath);
             try
@@ -43,7 +40,6 @@ namespace MediaPipeUnityDotsSamples.HandTracking.Editor
                 }
                 else
                 {
-                    Debug.Log("[MPUD Smoke] Tracker created successfully!");
                     MpudBridge.mpud_destroy_hand_tracker(tracker);
                     Debug.Log("[MPUD Smoke] destroy_hand_tracker completed");
                 }

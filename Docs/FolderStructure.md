@@ -44,9 +44,9 @@ MediaPipeUnityDOTS/
 ├── Assets/
 │   ├── MediaPipeUnityDots/
 │   │   ├── Runtime/
+│   │   ├── Sample/
 │   │   └── EditorTool/
 │   ├── Plugins/
-│   ├── MediaPipeUnityDotsSamples/
 │   ├── Scenes/
 │   └── Settings/
 ├── Packages/
@@ -71,11 +71,10 @@ MediaPipeUnityDOTS/
 - `Assets/Plugins`
   - 최종 배포용 네이티브 바이너리
   - 플랫폼별 플러그인 import 설정 대상
-- `Assets/MediaPipeUnityDotsSamples`
-  - 샘플용 MonoBehaviour
-  - 시각화
-  - 디버그 UI
-  - 예제 데이터 흐름
+- `Assets/MediaPipeUnityDots/Sample`
+  - 샘플용 MonoBehaviour (웹캠, 스포너, 디버그 UI)
+  - ECS 시각화 지원 (스포너 + 렌더 시스템)
+  - 예제 데이터 흐름 (adapter DTO)
 - `Assets/Scenes`
   - 실행 씬과 테스트 씬
 - `Assets/Settings`
@@ -92,8 +91,7 @@ MediaPipeUnityDOTS/
    - MediaPipe 코어와 맞닿는 네이티브 계층
 2. `Assets/MediaPipeUnityDots`
    - Unity 플러그인 계층
-3. `Assets/MediaPipeUnityDotsSamples`
-   - 검증 및 데모 계층
+3. `Assets/MediaPipeUnityDots/Sample`
 
 이렇게 나누면 브리지 계층과 샘플 계층이 섞이지 않아 PoC 이후 패키지화가 쉬워집니다.
 
@@ -103,13 +101,11 @@ MediaPipeUnityDOTS/
 
 1. `Native` 에 최소 브리지 API 정의
 2. `Assets/MediaPipeUnityDots/Runtime` 에 C# interop 레이어와 ECS 데이터 경로 작성
-3. `Assets/MediaPipeUnityDotsSamples` 와 `Assets/Scenes` 에 단일 모델 검증 씬 구성
-4. editor 지원이 필요해질 때만 `Assets/MediaPipeUnityDots/EditorTool` 확장
+3. `Assets/MediaPipeUnityDots/Sample` 와 `Assets/Scenes` 에 단일 모델 검증 씬 구성
 5. 구조가 안정되면 필요한 부분만 패키지화
 
 ## Notes
 
 - 현재 `Assets/TutorialInfo` 는 Unity 템플릿 기본 자산으로 보이며, 추후 정리 대상입니다.
-- `Assets/Scenes` 와 `Assets/Settings` 는 이미 존재하므로 그대로 유지하면서 `MediaPipeUnityDots`, `Plugins`, `MediaPipeUnityDotsSamples` 를 추가하는 쪽이 자연스럽습니다.
-- `EditorTool` 은 폴더 이름일 뿐이라 editor-only 컴파일 분리는 자동으로 생기지 않습니다. 실제 editor 전용 코드가 들어가면 이후 asmdef 또는 `#if UNITY_EDITOR` 정리가 필요합니다.
+- `Assets/Scenes` 와 `Assets/Settings` 는 이미 존재하므로 그대로 유지하면서 `MediaPipeUnityDots`, `Plugins` 를 추가하는 쪽이 자연스럽습니다.
 - 패키지화는 브리지 계층 경계가 충분히 안정된 뒤 진행하는 것이 좋습니다.

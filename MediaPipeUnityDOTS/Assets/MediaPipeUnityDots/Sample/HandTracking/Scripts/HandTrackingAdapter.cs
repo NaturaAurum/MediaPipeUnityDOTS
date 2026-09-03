@@ -2,7 +2,7 @@ using MediaPipeUnityDots.Runtime.Ecs;
 using Unity.Entities;
 using UnityEngine;
 
-namespace MediaPipeUnityDotsSamples.HandTracking
+namespace MediaPipeUnityDots.Sample.HandTracking.Scripts
 {
     /// <summary>
     /// ECS에서 hand tracking 상태를 읽어 caller-owned DTO에 복사하는 유일한 reader.
@@ -26,7 +26,7 @@ namespace MediaPipeUnityDotsSamples.HandTracking
             }
 
             var world = World.DefaultGameObjectInjectionWorld;
-            if (world == null || !world.IsCreated)
+            if (world is not { IsCreated: true })
             {
                 return false;
             }

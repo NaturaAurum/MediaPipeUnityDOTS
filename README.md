@@ -22,9 +22,9 @@ Unity DOTS (ECS + Jobs) 환경에서 MediaPipe를 성능 우선으로 통합하�
 │   ├── Assets/
 │   │   ├── MediaPipeUnityDots/
 │   │   │   ├── Runtime/
+│   │   │   ├── Sample/
 │   │   │   └── EditorTool/
 │   │   ├── Plugins/
-│   │   ├── MediaPipeUnityDotsSamples/
 │   │   └── Scenes/
 │   ├── Packages/
 │   └── ProjectSettings/

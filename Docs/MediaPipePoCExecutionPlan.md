@@ -70,17 +70,15 @@ MediaPipeUnityDOTS/Assets/MediaPipeUnityDots/
 │   └── Ecs/
 └── EditorTool/
 
-MediaPipeUnityDOTS/Assets/MediaPipeUnityDotsSamples/
+MediaPipeUnityDOTS/Assets/MediaPipeUnityDots/Sample/
 ├── HandTracking/
-│   ├── Scripts/
-│   ├── UI/
-│   └── Uxml/
+│   └── Scripts/
 ```
 
 The exact folders can evolve, but the ownership split should stay:
 
 - `Runtime`: plugin runtime, interop, ECS data flow
-- `Samples`: webcam glue, visualization, sample UI, sample scene assets
+- `Sample`: webcam glue, ECS-structured visualization (systems), sample UI, sample scene assets
 
 ## Execution Phases
 
@@ -195,8 +193,7 @@ The next agent should expect to create or modify files in these areas:
 - `MediaPipeUnityDOTS/Assets/MediaPipeUnityDots/Runtime/Interop/`
 - `MediaPipeUnityDOTS/Assets/MediaPipeUnityDots/Runtime/Tracking/`
 - `MediaPipeUnityDOTS/Assets/MediaPipeUnityDots/Runtime/Ecs/`
-- `MediaPipeUnityDOTS/Assets/MediaPipeUnityDotsSamples/HandTracking/Scripts/`
-- `MediaPipeUnityDOTS/Assets/MediaPipeUnityDotsSamples/HandTracking/Uxml/`
+- `MediaPipeUnityDOTS/Assets/MediaPipeUnityDots/Sample/HandTracking/Scripts/`
 - `MediaPipeUnityDOTS/Assets/Scenes/`
 - `MediaPipeUnityDOTS/Assets/StreamingAssets/MediaPipe/`
 

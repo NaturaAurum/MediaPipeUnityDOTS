@@ -1,6 +1,6 @@
 {
-  "name": "MediaPipeUnityDotsSamples.HandTracking.Editor",
-  "rootNamespace": "MediaPipeUnityDotsSamples.HandTracking.Editor",
+  "name": "MediaPipeUnityDots.Sample.HandTracking.Editor",
+  "rootNamespace": "MediaPipeUnityDots.Sample.HandTracking.Editor",
   "references": [
     "MediaPipeUnityDots.Runtime"
   ],

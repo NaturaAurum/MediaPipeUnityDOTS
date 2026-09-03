@@ -2,8 +2,11 @@
   "name": "MediaPipeUnityDots.Runtime",
   "rootNamespace": "",
   "references": [
+    "Unity.Burst",
     "Unity.Collections",
-    "Unity.Entities"
+    "Unity.Entities",
+    "Unity.Entities.Graphics",
+    "Unity.Transforms"
   ],
   "includePlatforms": [],
   "excludePlatforms": [],
