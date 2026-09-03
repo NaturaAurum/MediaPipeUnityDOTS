@@ -8,9 +8,9 @@ namespace MediaPipeUnityDots.Runtime.Input
     /// </summary>
     public sealed class MonotonicTimestampGenerator
     {
-        readonly Stopwatch _stopwatch;
+        private readonly Stopwatch _stopwatch;
 
-        long _lastTimestampUs;
+        private long _lastTimestampUs;
 
         public MonotonicTimestampGenerator()
         {
@@ -20,7 +20,7 @@ namespace MediaPipeUnityDots.Runtime.Input
 
         public long NextTimestampUs()
         {
-            long timestampUs = _stopwatch.ElapsedTicks * 1000000L / Stopwatch.Frequency;
+            var timestampUs = _stopwatch.ElapsedTicks * 1000000L / Stopwatch.Frequency;
             if (timestampUs <= _lastTimestampUs)
             {
                 timestampUs = _lastTimestampUs + 1;

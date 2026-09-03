@@ -7,13 +7,13 @@ namespace MediaPipeUnityDots.Runtime.Ecs
     {
         public static Entity GetOrCreateSingleton(EntityManager entityManager)
         {
-            EntityQuery singletonQuery = entityManager.CreateEntityQuery(typeof(HandTrackingStatus));
+            var singletonQuery = entityManager.CreateEntityQuery(typeof(HandTrackingStatus));
             try
             {
-                int entityCount = singletonQuery.CalculateEntityCount();
+                var entityCount = singletonQuery.CalculateEntityCount();
                 if (entityCount == 0)
                 {
-                    Entity entity = entityManager.CreateEntity();
+                    var entity = entityManager.CreateEntity();
                     entityManager.AddComponentData(entity, CreateEmptyStatus(0L, 0L));
                     entityManager.AddBuffer<LandmarkElement>(entity);
                     return entity;
@@ -21,7 +21,7 @@ namespace MediaPipeUnityDots.Runtime.Ecs
 
                 if (entityCount == 1)
                 {
-                    Entity entity = singletonQuery.GetSingletonEntity();
+                    var entity = singletonQuery.GetSingletonEntity();
                     if (!entityManager.HasBuffer<LandmarkElement>(entity))
                     {
                         entityManager.AddBuffer<LandmarkElement>(entity);
@@ -50,7 +50,7 @@ namespace MediaPipeUnityDots.Runtime.Ecs
             entityManager.GetBuffer<LandmarkElement>(entity).Clear();
         }
 
-        static HandTrackingStatus CreateEmptyStatus(long timestampUs, long frameCount)
+        private static HandTrackingStatus CreateEmptyStatus(long timestampUs, long frameCount)
         {
             return new HandTrackingStatus
             {

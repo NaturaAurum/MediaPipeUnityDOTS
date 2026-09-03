@@ -27,11 +27,10 @@ macOS Editor 환경에서 CPU-only single-hand landmark tracking PoC를 완성�
 |------|------|------|
 | Phase 0 - baseline 복구 | 완료 | Entities 설치, asmdef wiring, sample editor asmdef 분리, model/plugin 재생성 완료 |
 | Phase 1 - smoke test 재검증 | 완료 | batchmode smoke test 통과, create/destroy evidence 확보 |
-| Phase 2 - frame submit | 미착수 | 별도 PR로 분리 |
-| Phase 3 - polling/snapshot | 미착수 | Phase 2와 같은 PR 권장 |
-| Phase 4 - ECS runtime path | 미착수 | App/UI bridge push + singleton/dynamic buffer 기준 |
-| Phase 5 - sample visualization/UI | 미착수 | adapter -> plain DTO 경계 고정 |
-| Phase 6 - stability/profiling | 미착수 | Play Mode 10회, alloc/FPS 기록 |
+| Phase 2 - frame submit | 코드 구현됨 | `Runtime/Input` + `WebcamFrameProvider` 존재, Play Mode 실측 남음 |
+| Phase 3 - polling/snapshot | 코드 구현됨 | `Runtime/Tracking` (`HandTrackingService/Snapshot`) 존재, Play Mode 실측 남음 |
+| Phase 4 - ECS runtime path | 코드 구현됨 | singleton + `DynamicBuffer<LandmarkElement>` + read-validation system 존재, Play Mode 실측 남음 |
+| Phase 5 - sample visualization/UI | 코드 구현됨 (Play Mode 미검증) | `HandTrackingAdapter` (DTO) + `HandLandmarkVisualizer` + `HandTrackingStatusPanel` (UI Toolkit) + SampleScene 배선 완료. webcam 실측 남음 |
 
 현재 확정 사항:
 
@@ -39,15 +38,15 @@ macOS Editor 환경에서 CPU-only single-hand landmark tracking PoC를 완성�
 - `MediaPipeUnityDOTS/Assets/MediaPipeUnityDots/Runtime/MediaPipeUnityDots.Runtime.asmdef`에 `Unity.Collections`, `Unity.Entities` 참조를 추가함
 - `MediaPipeUnityDOTS/Assets/MediaPipeUnityDotsSamples/MediaPipeUnityDotsSamples.asmdef`에 `Unity.Collections`, `Unity.Entities` 참조를 추가하고 `allowUnsafeCode`를 `true`로 변경함
 - `MediaPipeUnityDOTS/Assets/MediaPipeUnityDotsSamples/HandTracking/Scripts/Editor/MediaPipeUnityDotsSamples.HandTracking.Editor.asmdef`를 추가해 `NativeSmokeTestRunner.cs`를 editor 전용 assembly로 분리함
-- `Native/Upstream/mediapipe` submodule을 `v0.10.33`으로 올림
+- `Native/Upstream/mediapipe` submodule을 `v1.0.0`으로 올림 (`6d31f1ebc3284db74d211d62bdc4f0a0c29ea120`)
 - `MediaPipeUnityDOTS/Assets/StreamingAssets/MediaPipe/Models/hand_landmarker.task`를 로컬에 재생성함
 - `MediaPipeUnityDOTS/Assets/Plugins/macOS/libmpud_bridge.dylib`를 로컬에 재생성함
 - `MediaPipeUnityDOTS/Assets/Plugins/macOS/libmpud_bridge.dylib.meta`에 Editor용 `PluginImporter` 설정을 고정함
-- `Native/Build/.bazelrc`를 MediaPipe v0.10.33 요구사항에 맞춰 C++20으로 상향함
+- `Native/Build/.bazelrc`를 MediaPipe v1.0.0 요구사항에 맞춰 C++20으로 상향함 (Bzlmod 대응 포함)
 - `Native/Build/BuildMacosEditor.sh`는 macOS 26의 zlib `fdopen` 블록 깨짐을 복구하도록 보강함
-- `Native/Build/BuildMacosEditor.sh`는 `bazelisk`를 통해 `Native/Upstream/mediapipe/.bazelversion`의 Bazel 7.4.1을 강제하고, `HERMETIC_PYTHON_VERSION=3.12`를 기본값으로 사용하도록 고정함
-- `Native/Patches/mediapipe/macos_arm64_compat.diff`를 v0.10.33 기준으로 재작성함
-- `Native/Patches/mediapipe/tasks_logging_analytics_compat.diff`를 추가해 공개 OSS 태그에 없는 `mediapipe/util/analytics` 의존성을 제거함
+- `Native/Build/BuildMacosEditor.sh`는 `bazelisk`를 통해 `Native/Upstream/mediapipe/.bazelversion`의 Bazel 7.4.1을 강제하고, `HERMETIC_PYTHON_VERSION=3.11`를 기본값으로 사용하도록 고정함 (MODULE.bazel `python_version = "3.11"`)
+- `Native/Patches/mediapipe/macos_arm64_compat.diff`를 v1.0.0 기준으로 유지함 (`PREFIX=opt/opencv@4`)
+- `Native/Patches/mediapipe/module_compat.diff`를 추가함 (`apple_support`를 `rules_cc`보다 먼저 선언해 Apple toolchain 우선 등록 + `rules_java 7.10.0 → 7.11.0`)
 - `Native/Build/CopyArtifactsToUnity.sh`는 기존 읽기 전용 dylib overwrite를 위해 `chmod u+w`를 수행함
 - 2026-04-03 기준 Unity 실행 중 인스턴스에서 `MediaPipe/Run Smoke Test` 메뉴를 재실행했고 create/destroy 로그 증거를 다시 확보함
 
@@ -57,7 +56,7 @@ macOS Editor 환경에서 CPU-only single-hand landmark tracking PoC를 완성�
 
 | 항목 | 결과 |
 |------|------|
-| MediaPipe submodule | `3987048d4b390aa9ae675c796f6421bbeece6511 (v0.10.33)` |
+| MediaPipe submodule | `6d31f1ebc3284db74d211d62bdc4f0a0c29ea120 (v1.0.0)` |
 | Bazelisk | `1.28.1` |
 | Bazel (`Native/Upstream/mediapipe` 기준) | `7.4.1` |
 | Python numpy | `2.4.2` |

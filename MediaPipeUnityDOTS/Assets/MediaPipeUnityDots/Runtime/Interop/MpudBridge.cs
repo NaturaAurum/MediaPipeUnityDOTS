@@ -9,7 +9,7 @@ namespace MediaPipeUnityDots.Runtime.Interop
     /// </summary>
     public static class MpudBridge
     {
-        const string DllName = "mpud_bridge";
+        private const string DllName = "mpud_bridge";
 
         [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
         public static extern int mpud_create_hand_tracker(
@@ -34,7 +34,7 @@ namespace MediaPipeUnityDots.Runtime.Interop
 
         public static string GetLastError()
         {
-            IntPtr ptr = mpud_get_last_error();
+            var ptr = mpud_get_last_error();
             return ptr == IntPtr.Zero ? "unknown error" : Marshal.PtrToStringAnsi(ptr);
         }
     }

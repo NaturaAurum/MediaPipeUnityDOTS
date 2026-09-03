@@ -13,29 +13,33 @@ namespace MediaPipeUnityDotsSamples.HandTracking
     /// </summary>
     public class WebcamFrameProvider : MonoBehaviour
     {
-        const int LandmarkCapacity = 21;
+        private const int LandmarkCapacity = 21;
 
-        [SerializeField] int requestedWidth = 640;
-        [SerializeField] int requestedHeight = 480;
-        [SerializeField] int requestedFps = 30;
-        [SerializeField] int logIntervalFrames = 60;
+        [SerializeField]
+        private int _requestedWidth = 640;
+        [SerializeField]
+        private int _requestedHeight = 480;
+        [SerializeField]
+        private int _requestedFps = 30;
+        [SerializeField]
+        private int _logIntervalFrames = 60;
 
-        WebCamTexture _webCamTexture;
-        HandTrackingService _service;
-        Color32[] _pixelBuffer;
-        MpudNormalizedLandmark[] _landmarkCopyBuffer;
-        World _ecsWorld;
-        Entity _singletonEntity;
-        bool _hasLoggedRuntimeMetadata;
-        bool _hasLoggedFrameSummary;
-        bool _lastLoggedFrameIsValid;
-        int _lastLoggedFrameHandedness;
-        int _lastLoggedFrameLandmarkCount;
-        bool _pendingResetSnapshotPush;
-        long _submitCount;
-        long _lastCopiedTimestamp;
+        private WebCamTexture _webCamTexture;
+        private HandTrackingService _service;
+        private Color32[] _pixelBuffer;
+        private MpudNormalizedLandmark[] _landmarkCopyBuffer;
+        private World _ecsWorld;
+        private Entity _singletonEntity;
+        private bool _hasLoggedRuntimeMetadata;
+        private bool _hasLoggedFrameSummary;
+        private bool _lastLoggedFrameIsValid;
+        private int _lastLoggedFrameHandedness;
+        private int _lastLoggedFrameLandmarkCount;
+        private bool _pendingResetSnapshotPush;
+        private long _submitCount;
+        private long _lastCopiedTimestamp;
 
-        void OnEnable()
+        private void OnEnable()
         {
             if (!Application.isPlaying)
             {
@@ -54,14 +58,14 @@ namespace MediaPipeUnityDotsSamples.HandTracking
             }
         }
 
-        void Update()
+        private void Update()
         {
             if (_webCamTexture == null || _service == null)
             {
                 return;
             }
 
-            if (_pendingResetSnapshotPush && TryGetEntityManager(out EntityManager resetEntityManager))
+            if (_pendingResetSnapshotPush && TryGetEntityManager(out var resetEntityManager))
             {
                 HandTrackingSingletonUtil.WriteResetEmptyState(resetEntityManager, _singletonEntity);
                 _pendingResetSnapshotPush = false;
@@ -72,14 +76,14 @@ namespace MediaPipeUnityDotsSamples.HandTracking
                 return;
             }
 
-            int width = _webCamTexture.width;
-            int height = _webCamTexture.height;
+            var width = _webCamTexture.width;
+            var height = _webCamTexture.height;
             if (width <= 0 || height <= 0)
             {
                 return;
             }
 
-            int pixelCount = checked(width * height);
+            var pixelCount = checked(width * height);
             if (_pixelBuffer == null || _pixelBuffer.Length != pixelCount)
             {
                 _pixelBuffer = new Color32[pixelCount];
@@ -87,7 +91,7 @@ namespace MediaPipeUnityDotsSamples.HandTracking
 
             _webCamTexture.GetPixels32(_pixelBuffer);
 
-            bool flipVertically = _webCamTexture.videoVerticallyMirrored;
+            var flipVertically = _webCamTexture.videoVerticallyMirrored;
             if (!_hasLoggedRuntimeMetadata)
             {
                 Debug.Log(
@@ -95,7 +99,7 @@ namespace MediaPipeUnityDotsSamples.HandTracking
                 _hasLoggedRuntimeMetadata = true;
             }
 
-            long previousFrameCount = _service.LatestFrameCount;
+            var previousFrameCount = _service.LatestFrameCount;
             _service.SubmitAndPoll(_pixelBuffer, width, height, flipVertically);
 
             if (_service.LatestFrameCount == previousFrameCount)
@@ -120,7 +124,7 @@ namespace MediaPipeUnityDotsSamples.HandTracking
                     $"[MPUD] Frame #{_service.LatestFrameCount} | Valid={_service.LatestIsValid} | Handedness={_service.LatestHandedness} | Score={_service.LatestScore:F2} | Landmarks={_service.LatestLandmarkCount} | ts={_service.LatestTimestampUs}");
             }
 
-            if (!TryGetEntityManager(out EntityManager entityManager))
+            if (!TryGetEntityManager(out var entityManager))
             {
                 return;
             }
@@ -134,25 +138,25 @@ namespace MediaPipeUnityDotsSamples.HandTracking
             _lastCopiedTimestamp = _service.LatestTimestampUs;
         }
 
-        void OnDisable()
+        private void OnDisable()
         {
             WriteResetStateIfPossible();
             DisposeResources();
         }
 
-        void OnDestroy()
+        private void OnDestroy()
         {
             DisposeResources();
         }
 
-        void InitializeResources()
+        private void InitializeResources()
         {
             if (_webCamTexture != null || _service != null)
             {
                 return;
             }
 
-            string modelPath = Path.Combine(
+            var modelPath = Path.Combine(
                 Application.streamingAssetsPath,
                 "MediaPipe",
                 "Models",
@@ -162,14 +166,14 @@ namespace MediaPipeUnityDotsSamples.HandTracking
                 throw new FileNotFoundException("hand_landmarker.task was not found.", modelPath);
             }
 
-            WebCamDevice[] devices = WebCamTexture.devices;
+            var devices = WebCamTexture.devices;
             if (devices == null || devices.Length == 0)
             {
                 throw new InvalidOperationException("No webcam devices were found.");
             }
 
             _service = new HandTrackingService(modelPath);
-            _webCamTexture = new WebCamTexture(devices[0].name, requestedWidth, requestedHeight, requestedFps);
+            _webCamTexture = new WebCamTexture(devices[0].name, _requestedWidth, _requestedHeight, _requestedFps);
             _webCamTexture.Play();
 
             _pixelBuffer = null;
@@ -190,7 +194,7 @@ namespace MediaPipeUnityDotsSamples.HandTracking
             Debug.Log($"[MPUD] Webcam provider started with device '{devices[0].name}'.");
         }
 
-        void DisposeResources()
+        private void DisposeResources()
         {
             if (_service != null)
             {
@@ -236,7 +240,7 @@ namespace MediaPipeUnityDotsSamples.HandTracking
             _lastCopiedTimestamp = 0;
         }
 
-        void PushLatestSnapshotToEcs(EntityManager entityManager)
+        private void PushLatestSnapshotToEcs(EntityManager entityManager)
         {
             if (_service.LatestIsValid)
             {
@@ -251,9 +255,9 @@ namespace MediaPipeUnityDotsSamples.HandTracking
                 _service.LatestFrameCount);
         }
 
-        void WriteValidPolledState(EntityManager entityManager)
+        private void WriteValidPolledState(EntityManager entityManager)
         {
-            int copiedCount = _service.CopyLatestLandmarksTo(_landmarkCopyBuffer);
+            var copiedCount = _service.CopyLatestLandmarksTo(_landmarkCopyBuffer);
 
             entityManager.SetComponentData(
                 _singletonEntity,
@@ -267,12 +271,12 @@ namespace MediaPipeUnityDotsSamples.HandTracking
                     FrameCount = _service.LatestFrameCount,
                 });
 
-            DynamicBuffer<LandmarkElement> landmarks = entityManager.GetBuffer<LandmarkElement>(_singletonEntity);
+            var landmarks = entityManager.GetBuffer<LandmarkElement>(_singletonEntity);
             landmarks.ResizeUninitialized(copiedCount);
 
-            for (int i = 0; i < copiedCount; i++)
+            for (var i = 0; i < copiedCount; i++)
             {
-                MpudNormalizedLandmark source = _landmarkCopyBuffer[i];
+                var source = _landmarkCopyBuffer[i];
                 landmarks[i] = new LandmarkElement
                 {
                     X = source.x,
@@ -284,11 +288,11 @@ namespace MediaPipeUnityDotsSamples.HandTracking
             }
         }
 
-        bool TryGetEntityManager(out EntityManager entityManager)
+        private bool TryGetEntityManager(out EntityManager entityManager)
         {
             entityManager = default;
 
-            World defaultWorld = World.DefaultGameObjectInjectionWorld;
+            var defaultWorld = World.DefaultGameObjectInjectionWorld;
             if (defaultWorld == null || !defaultWorld.IsCreated)
             {
                 _ecsWorld = null;
@@ -311,9 +315,9 @@ namespace MediaPipeUnityDotsSamples.HandTracking
             return true;
         }
 
-        void WriteResetStateIfPossible()
+        private void WriteResetStateIfPossible()
         {
-            if (!TryGetEntityManager(out EntityManager entityManager))
+            if (!TryGetEntityManager(out var entityManager))
             {
                 return;
             }
@@ -321,17 +325,17 @@ namespace MediaPipeUnityDotsSamples.HandTracking
             HandTrackingSingletonUtil.WriteResetEmptyState(entityManager, _singletonEntity);
         }
 
-        bool ShouldLogSubmit()
+        private bool ShouldLogSubmit()
         {
-            if (logIntervalFrames <= 0)
+            if (_logIntervalFrames <= 0)
             {
                 return true;
             }
 
-            return _submitCount % logIntervalFrames == 0;
+            return _submitCount % _logIntervalFrames == 0;
         }
 
-        bool ShouldLogFrameSummary()
+        private bool ShouldLogFrameSummary()
         {
             if (!_hasLoggedFrameSummary)
             {

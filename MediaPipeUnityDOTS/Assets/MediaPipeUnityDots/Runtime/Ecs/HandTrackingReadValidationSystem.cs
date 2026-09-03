@@ -6,16 +6,16 @@ namespace MediaPipeUnityDots.Runtime.Ecs
     [WorldSystemFilter(WorldSystemFilterFlags.Default | WorldSystemFilterFlags.Editor)]
     public partial struct HandTrackingReadValidationSystem : ISystem
     {
-        const int LogIntervalFrames = 60;
+        private const int LogIntervalFrames = 60;
 
-        long _lastLoggedTimestampUs;
-        long _lastLoggedFrameCount;
-        bool _hasLoggedState;
-        bool _hasReportedState;
-        bool _lastReportedIsValid;
-        int _lastReportedHandedness;
-        int _lastReportedLandmarkCount;
-        int _lastReportedBufferLength;
+        private long _lastLoggedTimestampUs;
+        private long _lastLoggedFrameCount;
+        private bool _hasLoggedState;
+        private bool _hasReportedState;
+        private bool _lastReportedIsValid;
+        private int _lastReportedHandedness;
+        private int _lastReportedLandmarkCount;
+        private int _lastReportedBufferLength;
 
         public void OnCreate(ref SystemState state)
         {
@@ -24,11 +24,11 @@ namespace MediaPipeUnityDots.Runtime.Ecs
 
         public void OnUpdate(ref SystemState state)
         {
-            int singletonCount = 0;
-            Entity singletonEntity = Entity.Null;
+            var singletonCount = 0;
+            var singletonEntity = Entity.Null;
             HandTrackingStatus status = default;
 
-            foreach ((RefRO<HandTrackingStatus> currentStatus, Entity entity) in SystemAPI.Query<RefRO<HandTrackingStatus>>().WithEntityAccess())
+            foreach ((var currentStatus, var entity) in SystemAPI.Query<RefRO<HandTrackingStatus>>().WithEntityAccess())
             {
                 singletonCount++;
                 if (singletonCount > 1)
@@ -57,7 +57,7 @@ namespace MediaPipeUnityDots.Runtime.Ecs
                 return;
             }
 
-            DynamicBuffer<LandmarkElement> landmarks = SystemAPI.GetBuffer<LandmarkElement>(singletonEntity);
+            var landmarks = SystemAPI.GetBuffer<LandmarkElement>(singletonEntity);
 
             _hasLoggedState = true;
             _lastLoggedTimestampUs = status.TimestampUs;
@@ -78,7 +78,7 @@ namespace MediaPipeUnityDots.Runtime.Ecs
                 $"[MPUD ECS] Frame #{status.FrameCount} | Valid={status.IsValid} | Handedness={status.Handedness} | Score={status.Score:F2} | Landmarks={status.LandmarkCount} | BufferLength={landmarks.Length} | ts={status.TimestampUs}");
         }
 
-        bool ShouldLogState(in HandTrackingStatus status, int bufferLength)
+        private bool ShouldLogState(in HandTrackingStatus status, int bufferLength)
         {
             if (!_hasReportedState)
             {

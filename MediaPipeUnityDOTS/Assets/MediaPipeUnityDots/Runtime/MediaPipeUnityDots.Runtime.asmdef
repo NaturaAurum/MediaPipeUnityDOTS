@@ -1,6 +1,6 @@
 {
   "name": "MediaPipeUnityDots.Runtime",
-  "rootNamespace": "MediaPipeUnityDots.Runtime",
+  "rootNamespace": "",
   "references": [
     "Unity.Collections",
     "Unity.Entities"

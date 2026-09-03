@@ -11,7 +11,7 @@ namespace MediaPipeUnityDots.Runtime.Input
     /// </summary>
     public static class ImageFrameConverter
     {
-        const int BytesPerPixel = 4;
+        private const int BytesPerPixel = 4;
 
         /// <summary>
         /// Color32[]을 상하 반전하여 destination에 복사한다.
@@ -20,31 +20,45 @@ namespace MediaPipeUnityDots.Runtime.Input
         public static void FlipVertical(Color32[] source, Color32[] destination, int width, int height)
         {
             if (source == null)
+            {
                 throw new ArgumentNullException(nameof(source));
+            }
 
             if (destination == null)
+            {
                 throw new ArgumentNullException(nameof(destination));
+            }
 
             if (ReferenceEquals(source, destination))
+            {
                 throw new ArgumentException("source and destination must be different arrays.", nameof(destination));
+            }
 
             if (width <= 0)
+            {
                 throw new ArgumentOutOfRangeException(nameof(width));
+            }
 
             if (height <= 0)
+            {
                 throw new ArgumentOutOfRangeException(nameof(height));
+            }
 
-            int expectedLength = checked(width * height);
+            var expectedLength = checked(width * height);
             if (source.Length != expectedLength)
+            {
                 throw new ArgumentException("source length must match width * height.", nameof(source));
+            }
 
             if (destination.Length != expectedLength)
-                throw new ArgumentException("destination length must match width * height.", nameof(destination));
-
-            for (int row = 0; row < height; row++)
             {
-                int sourceIndex = (height - 1 - row) * width;
-                int destinationIndex = row * width;
+                throw new ArgumentException("destination length must match width * height.", nameof(destination));
+            }
+
+            for (var row = 0; row < height; row++)
+            {
+                var sourceIndex = (height - 1 - row) * width;
+                var destinationIndex = row * width;
                 Array.Copy(source, sourceIndex, destination, destinationIndex, width);
             }
         }
@@ -57,13 +71,19 @@ namespace MediaPipeUnityDots.Runtime.Input
         public static MpudImageFrame CreateFrame(GCHandle pinnedHandle, int width, int height, long timestampUs)
         {
             if (!pinnedHandle.IsAllocated)
+            {
                 throw new ArgumentException("pinnedHandle must be allocated.", nameof(pinnedHandle));
+            }
 
             if (width <= 0)
+            {
                 throw new ArgumentOutOfRangeException(nameof(width));
+            }
 
             if (height <= 0)
+            {
                 throw new ArgumentOutOfRangeException(nameof(height));
+            }
 
             return new MpudImageFrame
             {

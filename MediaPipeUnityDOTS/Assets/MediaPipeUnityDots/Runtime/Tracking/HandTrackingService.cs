@@ -13,23 +13,25 @@ namespace MediaPipeUnityDots.Runtime.Tracking
     /// </summary>
     public sealed class HandTrackingService : IDisposable
     {
-        const int NumHands = 1;
-        const float MinDetectionConfidence = 0.5f;
-        const float MinTrackingConfidence = 0.5f;
-        const int RunningModeVideo = 1;
+        private const int NumHands = 1;
+        private const float MinDetectionConfidence = 0.5f;
+        private const float MinTrackingConfidence = 0.5f;
+        private const int RunningModeVideo = 1;
 
-        readonly string _modelPath;
-        readonly HandTrackingSnapshot _snapshot;
-        readonly MonotonicTimestampGenerator _timestampGenerator;
+        private readonly string _modelPath;
+        private readonly HandTrackingSnapshot _snapshot;
+        private readonly MonotonicTimestampGenerator _timestampGenerator;
 
-        IntPtr _trackerHandle;
-        Color32[] _flipBuffer;
-        bool _disposed;
+        private IntPtr _trackerHandle;
+        private Color32[] _flipBuffer;
+        private bool _disposed;
 
         public HandTrackingService(string modelPath)
         {
             if (string.IsNullOrWhiteSpace(modelPath))
+            {
                 throw new ArgumentException("modelPath must not be null or empty.", nameof(modelPath));
+            }
 
             _modelPath = modelPath;
             _snapshot = new HandTrackingSnapshot();
@@ -68,19 +70,27 @@ namespace MediaPipeUnityDots.Runtime.Tracking
             }
 
             if (pixels == null)
+            {
                 throw new ArgumentNullException(nameof(pixels));
+            }
 
             if (width <= 0)
+            {
                 throw new ArgumentOutOfRangeException(nameof(width));
+            }
 
             if (height <= 0)
+            {
                 throw new ArgumentOutOfRangeException(nameof(height));
+            }
 
-            int pixelCount = checked(width * height);
+            var pixelCount = checked(width * height);
             if (pixels.Length != pixelCount)
+            {
                 throw new ArgumentException("pixels length must match width * height.", nameof(pixels));
+            }
 
-            Color32[] submitPixels = pixels;
+            var submitPixels = pixels;
             if (flipVertically)
             {
                 EnsureFlipBuffer(pixelCount);
@@ -92,13 +102,13 @@ namespace MediaPipeUnityDots.Runtime.Tracking
             try
             {
                 pinnedHandle = GCHandle.Alloc(submitPixels, GCHandleType.Pinned);
-                MpudImageFrame frame = ImageFrameConverter.CreateFrame(
+                var frame = ImageFrameConverter.CreateFrame(
                     pinnedHandle,
                     width,
                     height,
                     _timestampGenerator.NextTimestampUs());
 
-                int submitStatus = MpudBridge.mpud_submit_frame(_trackerHandle, ref frame);
+                var submitStatus = MpudBridge.mpud_submit_frame(_trackerHandle, ref frame);
                 if (submitStatus != MpudStatus.Ok)
                 {
                     Debug.LogError($"[MPUD] submit_frame failed ({submitStatus}): {MpudBridge.GetLastError()}");
@@ -113,7 +123,7 @@ namespace MediaPipeUnityDots.Runtime.Tracking
                 }
             }
 
-            int pollStatus = MpudBridge.mpud_try_get_latest_result(_trackerHandle, out MpudHandResult result);
+            var pollStatus = MpudBridge.mpud_try_get_latest_result(_trackerHandle, out var result);
             if (pollStatus == MpudStatus.Ok)
             {
                 _snapshot.UpdateFrom(ref result);
@@ -168,9 +178,9 @@ namespace MediaPipeUnityDots.Runtime.Tracking
             _disposed = true;
         }
 
-        void CreateAndStartTracker()
+        private void CreateAndStartTracker()
         {
-            IntPtr modelPathNative = MarshalStringToUtf8(_modelPath);
+            var modelPathNative = MarshalStringToUtf8(_modelPath);
             try
             {
                 var config = new MpudHandTrackerConfig
@@ -182,16 +192,16 @@ namespace MediaPipeUnityDots.Runtime.Tracking
                     runningMode = RunningModeVideo,
                 };
 
-                int createStatus = MpudBridge.mpud_create_hand_tracker(ref config, out IntPtr trackerHandle);
+                var createStatus = MpudBridge.mpud_create_hand_tracker(ref config, out var trackerHandle);
                 if (createStatus != MpudStatus.Ok)
                 {
                     throw new InvalidOperationException($"[MPUD] create_hand_tracker failed ({createStatus}): {MpudBridge.GetLastError()}");
                 }
 
-                int startStatus = MpudBridge.mpud_start_hand_tracker(trackerHandle);
+                var startStatus = MpudBridge.mpud_start_hand_tracker(trackerHandle);
                 if (startStatus != MpudStatus.Ok)
                 {
-                    string error = MpudBridge.GetLastError();
+                    var error = MpudBridge.GetLastError();
                     MpudBridge.mpud_destroy_hand_tracker(trackerHandle);
                     throw new InvalidOperationException($"[MPUD] start_hand_tracker failed ({startStatus}): {error}");
                 }
@@ -205,7 +215,7 @@ namespace MediaPipeUnityDots.Runtime.Tracking
             }
         }
 
-        void DestroyTracker()
+        private void DestroyTracker()
         {
             if (_trackerHandle == IntPtr.Zero)
             {
@@ -216,7 +226,7 @@ namespace MediaPipeUnityDots.Runtime.Tracking
             _trackerHandle = IntPtr.Zero;
         }
 
-        void EnsureFlipBuffer(int pixelCount)
+        private void EnsureFlipBuffer(int pixelCount)
         {
             if (_flipBuffer == null || _flipBuffer.Length != pixelCount)
             {
@@ -224,7 +234,7 @@ namespace MediaPipeUnityDots.Runtime.Tracking
             }
         }
 
-        void ThrowIfDisposed()
+        private void ThrowIfDisposed()
         {
             if (_disposed)
             {
@@ -232,10 +242,10 @@ namespace MediaPipeUnityDots.Runtime.Tracking
             }
         }
 
-        static IntPtr MarshalStringToUtf8(string value)
+        private static IntPtr MarshalStringToUtf8(string value)
         {
-            byte[] bytes = Encoding.UTF8.GetBytes(value);
-            IntPtr ptr = Marshal.AllocHGlobal(bytes.Length + 1);
+            var bytes = Encoding.UTF8.GetBytes(value);
+            var ptr = Marshal.AllocHGlobal(bytes.Length + 1);
             Marshal.Copy(bytes, 0, ptr, bytes.Length);
             Marshal.WriteByte(ptr, bytes.Length, 0);
             return ptr;

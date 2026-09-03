@@ -8,18 +8,18 @@ namespace MediaPipeUnityDotsSamples.HandTracking
 {
     public class NativeSmokeTest : MonoBehaviour
     {
-        void Start()
+        private void Start()
         {
             Debug.Log("[MPUD Smoke] === Native Bridge Smoke Test ===");
 
-            string err = MpudBridge.GetLastError();
+            var err = MpudBridge.GetLastError();
             Debug.Log($"[MPUD Smoke] Initial error state: {err}");
 
-            string modelPath = System.IO.Path.Combine(
+            var modelPath = System.IO.Path.Combine(
                 Application.streamingAssetsPath,
                 "MediaPipe/Models/hand_landmarker.task");
 
-            IntPtr modelPathNative = MarshalStringToUtf8(modelPath);
+            var modelPathNative = MarshalStringToUtf8(modelPath);
             try
             {
                 var config = new MpudHandTrackerConfig
@@ -31,7 +31,7 @@ namespace MediaPipeUnityDotsSamples.HandTracking
                     runningMode = 1,
                 };
 
-                int status = MpudBridge.mpud_create_hand_tracker(ref config, out IntPtr tracker);
+                var status = MpudBridge.mpud_create_hand_tracker(ref config, out var tracker);
                 Debug.Log($"[MPUD Smoke] create_hand_tracker status: {status}");
 
                 if (status != MpudStatus.Ok)
@@ -52,10 +52,10 @@ namespace MediaPipeUnityDotsSamples.HandTracking
             Debug.Log("[MPUD Smoke] === Smoke Test Complete (no crash) ===");
         }
 
-        static IntPtr MarshalStringToUtf8(string s)
+        private static IntPtr MarshalStringToUtf8(string s)
         {
-            byte[] bytes = Encoding.UTF8.GetBytes(s);
-            IntPtr ptr = Marshal.AllocHGlobal(bytes.Length + 1);
+            var bytes = Encoding.UTF8.GetBytes(s);
+            var ptr = Marshal.AllocHGlobal(bytes.Length + 1);
             Marshal.Copy(bytes, 0, ptr, bytes.Length);
             Marshal.WriteByte(ptr, bytes.Length, 0);
             return ptr;

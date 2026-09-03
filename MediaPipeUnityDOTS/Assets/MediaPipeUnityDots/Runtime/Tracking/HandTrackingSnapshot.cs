@@ -9,9 +9,9 @@ namespace MediaPipeUnityDots.Runtime.Tracking
     /// </summary>
     public sealed class HandTrackingSnapshot
     {
-        const int LandmarkCapacity = 21;
+        private const int LandmarkCapacity = 21;
 
-        readonly MpudNormalizedLandmark[] _landmarks;
+        private readonly MpudNormalizedLandmark[] _landmarks;
 
         public HandTrackingSnapshot()
         {
@@ -48,7 +48,7 @@ namespace MediaPipeUnityDots.Runtime.Tracking
                 return;
             }
 
-            int landmarkCount = nativeResult.landmarkCount;
+            var landmarkCount = nativeResult.landmarkCount;
             if (landmarkCount < 0)
             {
                 landmarkCount = 0;
@@ -64,7 +64,7 @@ namespace MediaPipeUnityDots.Runtime.Tracking
             LandmarkCount = landmarkCount;
             TimestampUs = nativeResult.timestampUs;
 
-            for (int i = 0; i < landmarkCount; i++)
+            for (var i = 0; i < landmarkCount; i++)
             {
                 _landmarks[i] = nativeResult.GetLandmark(i);
             }
@@ -83,10 +83,14 @@ namespace MediaPipeUnityDots.Runtime.Tracking
         public int CopyLandmarksTo(MpudNormalizedLandmark[] destination)
         {
             if (destination == null)
+            {
                 throw new ArgumentNullException(nameof(destination));
+            }
 
             if (destination.Length < LandmarkCapacity)
+            {
                 throw new ArgumentException("destination length must be at least 21.", nameof(destination));
+            }
 
             if (LandmarkCount > 0)
             {
@@ -117,7 +121,7 @@ namespace MediaPipeUnityDots.Runtime.Tracking
             FrameCount = 0;
         }
 
-        void SetInvalidState(long timestampUs)
+        private void SetInvalidState(long timestampUs)
         {
             IsValid = false;
             Handedness = -1;

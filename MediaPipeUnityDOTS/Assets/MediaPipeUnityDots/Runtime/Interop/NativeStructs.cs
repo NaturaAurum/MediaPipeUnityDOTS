@@ -42,20 +42,20 @@ namespace MediaPipeUnityDots.Runtime.Interop
         public MpudNormalizedLandmark GetLandmark(int i)
         {
             if (i < 0 || i >= landmarkCount)
-                throw new ArgumentOutOfRangeException(nameof(i));
-
-            fixed (float* p = landmarkData)
             {
-                int offset = i * 5;
-                return new MpudNormalizedLandmark
-                {
-                    x = p[offset],
-                    y = p[offset + 1],
-                    z = p[offset + 2],
-                    visibility = p[offset + 3],
-                    presence = p[offset + 4],
-                };
+                throw new ArgumentOutOfRangeException(nameof(i));
             }
+
+            var offset = i * 5;
+            return new MpudNormalizedLandmark
+            {
+                x = landmarkData[offset],
+                y = landmarkData[offset + 1],
+                z = landmarkData[offset + 2],
+                visibility = landmarkData[offset + 3],
+                presence = landmarkData[offset + 4],
+            };
+
         }
     }
 

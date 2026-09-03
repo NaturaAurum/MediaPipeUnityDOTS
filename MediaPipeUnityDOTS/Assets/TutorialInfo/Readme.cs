@@ -4,17 +4,17 @@ using UnityEngine.UIElements;
 
 public class Readme : ScriptableObject
 {
-    public StyleSheet commonStyle;
-    public StyleSheet darkStyle;
-    public StyleSheet lightStyle;
-    public Texture2D icon;
-    public string title;
-    public Section[] sections;
-    public bool loadedLayout;
+    public StyleSheet CommonStyle;
+    public StyleSheet DarkStyle;
+    public StyleSheet LightStyle;
+    public Texture2D Icon;
+    public string Title;
+    public Section[] Sections;
+    public bool LoadedLayout;
 
     [Serializable]
     public class Section
     {
-        public string heading, text, linkText, url;
+        public string Heading, Text, LinkText, URL;
     }
 }
