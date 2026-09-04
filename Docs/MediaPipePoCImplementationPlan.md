@@ -313,6 +313,13 @@ poll -> snapshot copy -> ECS push -> adapter read -> visualizer/presenter 반영
 - steady-state poll 경로 `GC Alloc` 0B 또는 측정값 기록
 - 반복 경고/에러 누적 없음
 
+측정 결과 (Editor Play Mode, 2026-09-05):
+
+- `WebcamFrameProvider.Update`: 0.00 ms / 0 B/frame
+- `WebcamBackgroundRenderer.LateUpdate`: 0.02 ms / 0 B/frame
+- `HandTrackingStatusPanel.LateUpdate`: 348 B/frame (UI 라벨 문자열, poll 경로 아님)
+- Play Mode 10회 진입/퇴장: crash 0/10, LED잔류 0회 (2026-09-05)
+
 ## PR 분리 기준
 
 - 현재 PR 범위는 Phase 0 baseline 복구와 Phase 1 smoke-test 재검증 준비 상태 확보까지로 제한함
