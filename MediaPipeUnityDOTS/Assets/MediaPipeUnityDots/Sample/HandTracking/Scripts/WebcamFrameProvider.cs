@@ -22,7 +22,14 @@ namespace MediaPipeUnityDots.Sample.HandTracking.Scripts
         [SerializeField]
         private int _requestedFps = 30;
         [SerializeField]
+        private int _numHands = 2;
+        [SerializeField]
         private int _logIntervalFrames = 60;
+
+        /// <summary>
+        /// 추적할 손 수. HandTrackingService와 포인트 스포너가 공유한다.
+        /// </summary>
+        public int NumHands => Mathf.Clamp(_numHands, 1, MpudHandResult.MaxHands);
 
         private WebCamTexture _webCamTexture;
         private HandTrackingService _service;
@@ -121,7 +128,7 @@ namespace MediaPipeUnityDots.Sample.HandTracking.Scripts
                 _lastLoggedFrameLandmarkCount = _service.LatestLandmarkCount;
 
                 Debug.Log(
-                    $"[MPUD] Frame #{_service.LatestFrameCount} | Valid={_service.LatestIsValid} | Handedness={_service.LatestHandedness} | Score={_service.LatestScore:F2} | Landmarks={_service.LatestLandmarkCount} | ts={_service.LatestTimestampUs}");
+                    $"[MPUD] Frame #{_service.LatestFrameCount} | Valid={_service.LatestIsValid} | Hands={_service.LatestHandCount} | Handedness={_service.LatestHandedness} | Score={_service.LatestScore:F2} | Landmarks={_service.LatestLandmarkCount} | ts={_service.LatestTimestampUs}");
             }
 
             if (!TryGetEntityManager(out var entityManager))
@@ -169,7 +176,7 @@ namespace MediaPipeUnityDots.Sample.HandTracking.Scripts
                 throw new InvalidOperationException("No webcam devices were found.");
             }
 
-            _service = new HandTrackingService(modelPath);
+            _service = new HandTrackingService(modelPath, _numHands);
             _webCamTexture = new WebCamTexture(devices[0].name, _requestedWidth, _requestedHeight, _requestedFps);
             _webCamTexture.Play();
 
@@ -256,37 +263,56 @@ namespace MediaPipeUnityDots.Sample.HandTracking.Scripts
                 _service.LatestTimestampUs,
                 _service.LatestFrameCount);
         }
-
         private void WriteValidPolledState(EntityManager entityManager)
         {
-            var copiedCount = _service.CopyLatestLandmarksTo(_landmarkCopyBuffer);
+            var handCount = _service.LatestHandCount;
 
-            entityManager.SetComponentData(
-                _singletonEntity,
-                new HandTrackingStatus
-                {
-                    IsValid = true,
-                    Handedness = _service.LatestHandedness,
-                    Score = _service.LatestScore,
-                    LandmarkCount = copiedCount,
-                    TimestampUs = _service.LatestTimestampUs,
-                    FrameCount = _service.LatestFrameCount,
-                });
-
-            var landmarks = entityManager.GetBuffer<LandmarkElement>(_singletonEntity);
-            landmarks.ResizeUninitialized(copiedCount);
-
-            for (var i = 0; i < copiedCount; i++)
+            var status = new HandTrackingStatus
             {
-                var source = _landmarkCopyBuffer[i];
-                landmarks[i] = new LandmarkElement
+                IsValid = true,
+                HandCount = handCount,
+                Handedness = _service.LatestHandedness,
+                Score = _service.LatestScore,
+                LandmarkCount = _service.LatestLandmarkCount,
+                TimestampUs = _service.LatestTimestampUs,
+                FrameCount = _service.LatestFrameCount,
+            };
+            status.HandednessList.Clear();
+            status.ScoreList.Clear();
+            for (var h = 0; h < handCount; h++)
+            {
+                status.HandednessList.Add(_service.GetLatestHandedness(h));
+                status.ScoreList.Add(_service.GetLatestScore(h));
+            }
+
+            entityManager.SetComponentData(_singletonEntity, status);
+            var landmarks = entityManager.GetBuffer<LandmarkElement>(_singletonEntity);
+            landmarks.ResizeUninitialized(handCount * LandmarkCapacity);
+
+            for (var h = 0; h < handCount; h++)
+            {
+                var copiedCount = _service.CopyLatestHandLandmarksTo(h, _landmarkCopyBuffer);
+                for (var i = 0; i < LandmarkCapacity; i++)
                 {
-                    X = source.x,
-                    Y = source.y,
-                    Z = source.z,
-                    Visibility = source.visibility,
-                    Presence = source.presence,
-                };
+                    var bufferIndex = h * LandmarkCapacity + i;
+                    if (i < copiedCount)
+                    {
+                        var source = _landmarkCopyBuffer[i];
+                        landmarks[bufferIndex] = new LandmarkElement
+                        {
+                            X = source.x,
+                            Y = source.y,
+                            Z = source.z,
+                            Visibility = source.visibility,
+                            Presence = source.presence,
+                            HandIndex = h,
+                        };
+                    }
+                    else
+                    {
+                        landmarks[bufferIndex] = new LandmarkElement { HandIndex = -1 };
+                    }
+                }
             }
         }
 

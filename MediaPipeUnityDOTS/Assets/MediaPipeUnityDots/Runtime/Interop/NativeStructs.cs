@@ -29,33 +29,69 @@ namespace MediaPipeUnityDots.Runtime.Interop
     [StructLayout(LayoutKind.Sequential)]
     public unsafe struct MpudHandResult
     {
-        public int isValid;
-        public int landmarkCount;
-        public int handedness;
-        public float score;
+        public const int MaxHands = 4;
+        public const int LandmarksPerHand = 21;
+
+        // 손당: landmarkCount(int) + handedness(int) + score(float) + 105 floats = 108 floats.
+        // C MpudHandResult와 바이트 일치(handCount int + pad + timestamp long + 4×432).
+        // 네이티브 헤더의 static assert와 쌍을 이룸. ExpectedSize 불일치는 ABI 드리프트다.
+        public const int ExpectedSize = 1744;
+
+        private const int FloatsPerHand = 108;
+
+        public int handCount;
         public long timestampUs;
+        public fixed float handData[MaxHands * FloatsPerHand];
 
-        // 21 landmarks × 5 floats (x, y, z, visibility, presence) = 105 floats
-        // C 측 MpudNormalizedLandmark landmarks[21] 과 동일한 420 bytes
-        public fixed float landmarkData[105];
-
-        public MpudNormalizedLandmark GetLandmark(int i)
+        public int GetHandLandmarkCount(int hand)
         {
-            if (i < 0 || i >= landmarkCount)
+            CheckHand(hand);
+            fixed (float* data = handData)
+            {
+                return *(int*)(data + hand * FloatsPerHand);
+            }
+        }
+
+        public int GetHandedness(int hand)
+        {
+            CheckHand(hand);
+            fixed (float* data = handData)
+            {
+                return *(int*)(data + hand * FloatsPerHand + 1);
+            }
+        }
+
+        public float GetHandScore(int hand)
+        {
+            CheckHand(hand);
+            return handData[hand * FloatsPerHand + 2];
+        }
+
+        public MpudNormalizedLandmark GetHandLandmark(int hand, int i)
+        {
+            CheckHand(hand);
+            if (i < 0 || i >= GetHandLandmarkCount(hand))
             {
                 throw new ArgumentOutOfRangeException(nameof(i));
             }
 
-            var offset = i * 5;
+            var offset = hand * FloatsPerHand + 3 + i * 5;
             return new MpudNormalizedLandmark
             {
-                x = landmarkData[offset],
-                y = landmarkData[offset + 1],
-                z = landmarkData[offset + 2],
-                visibility = landmarkData[offset + 3],
-                presence = landmarkData[offset + 4],
+                x = handData[offset],
+                y = handData[offset + 1],
+                z = handData[offset + 2],
+                visibility = handData[offset + 3],
+                presence = handData[offset + 4],
             };
+        }
 
+        private static void CheckHand(int hand)
+        {
+            if (hand < 0 || hand >= MaxHands)
+            {
+                throw new ArgumentOutOfRangeException(nameof(hand));
+            }
         }
     }
 

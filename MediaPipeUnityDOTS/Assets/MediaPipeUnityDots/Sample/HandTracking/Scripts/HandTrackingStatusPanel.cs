@@ -84,8 +84,8 @@ namespace MediaPipeUnityDots.Sample.HandTracking.Scripts
             _stateLabel.text = $"state: {(_dto.IsValid ? "tracking" : "idle")}";
             _frameLabel.text = $"frame: {_dto.FrameCount}";
             _timestampLabel.text = $"timestamp: {_dto.TimestampUs} us";
-            _handednessLabel.text = $"hand: {HandednessText(_dto.Handedness)}";
-            _confidenceLabel.text = $"confidence: {_dto.Score:F2} ({_dto.PointCount} pts)";
+            _handednessLabel.text = $"hands: {HandsText(_dto)}";
+            _confidenceLabel.text = $"points: {_dto.PointCount}";
         }
 
         private void OnResetClicked()
@@ -102,5 +102,21 @@ namespace MediaPipeUnityDots.Sample.HandTracking.Scripts
             1 => "Right",
             _ => "-",
         };
+
+        private static string HandsText(HandTrackingDto dto)
+        {
+            if (dto.HandCount <= 0)
+            {
+                return "-";
+            }
+
+            var parts = new string[dto.HandCount];
+            for (var h = 0; h < dto.HandCount; h++)
+            {
+                parts[h] = $"{HandednessText(dto.Handedness[h])} {dto.Scores[h]:F2}";
+            }
+
+            return string.Join(" | ", parts);
+        }
     }
 }

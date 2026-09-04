@@ -2,7 +2,7 @@ using Unity.Entities;
 
 namespace MediaPipeUnityDots.Runtime.Ecs
 {
-    [InternalBufferCapacity(21)]
+    [InternalBufferCapacity(84)]
     public struct LandmarkElement : IBufferElementData
     {
         public float X;
@@ -10,5 +10,6 @@ namespace MediaPipeUnityDots.Runtime.Ecs
         public float Z;
         public float Visibility;
         public float Presence;
+        public int HandIndex;
     }
 }

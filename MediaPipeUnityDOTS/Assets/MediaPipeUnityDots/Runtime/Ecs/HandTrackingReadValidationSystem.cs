@@ -15,6 +15,7 @@ namespace MediaPipeUnityDots.Runtime.Ecs
         private bool _lastReportedIsValid;
         private int _lastReportedHandedness;
         private int _lastReportedLandmarkCount;
+        private int _lastReportedHandCount;
         private int _lastReportedBufferLength;
 
         public void OnCreate(ref SystemState state)
@@ -72,10 +73,11 @@ namespace MediaPipeUnityDots.Runtime.Ecs
             _lastReportedIsValid = status.IsValid;
             _lastReportedHandedness = status.Handedness;
             _lastReportedLandmarkCount = status.LandmarkCount;
+            _lastReportedHandCount = status.HandCount;
             _lastReportedBufferLength = landmarks.Length;
 
             Debug.Log(
-                $"[MPUD ECS] Frame #{status.FrameCount} | Valid={status.IsValid} | Handedness={status.Handedness} | Score={status.Score:F2} | Landmarks={status.LandmarkCount} | BufferLength={landmarks.Length} | ts={status.TimestampUs}");
+                $"[MPUD ECS] Frame #{status.FrameCount} | Valid={status.IsValid} | Hands={status.HandCount} | Handedness={status.Handedness} | Score={status.Score:F2} | Landmarks={status.LandmarkCount} | BufferLength={landmarks.Length} | ts={status.TimestampUs}");
         }
 
         private bool ShouldLogState(in HandTrackingStatus status, int bufferLength)
@@ -86,6 +88,7 @@ namespace MediaPipeUnityDots.Runtime.Ecs
             }
 
             if (status.IsValid != _lastReportedIsValid
+                || status.HandCount != _lastReportedHandCount
                 || status.Handedness != _lastReportedHandedness
                 || status.LandmarkCount != _lastReportedLandmarkCount
                 || bufferLength != _lastReportedBufferLength)

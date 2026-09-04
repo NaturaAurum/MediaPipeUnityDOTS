@@ -13,12 +13,12 @@ namespace MediaPipeUnityDots.Runtime.Tracking
     /// </summary>
     public sealed class HandTrackingService : IDisposable
     {
-        private const int NumHands = 1;
         private const float MinDetectionConfidence = 0.5f;
         private const float MinTrackingConfidence = 0.5f;
         private const int RunningModeVideo = 1;
 
         private readonly string _modelPath;
+        private readonly int _numHands;
         private readonly HandTrackingSnapshot _snapshot;
         private readonly MonotonicTimestampGenerator _timestampGenerator;
 
@@ -26,14 +26,24 @@ namespace MediaPipeUnityDots.Runtime.Tracking
         private Color32[] _flipBuffer;
         private bool _disposed;
 
-        public HandTrackingService(string modelPath)
+        public HandTrackingService(string modelPath, int numHands = 2)
         {
             if (string.IsNullOrWhiteSpace(modelPath))
             {
                 throw new ArgumentException("modelPath must not be null or empty.", nameof(modelPath));
             }
 
+            if (numHands < 1)
+            {
+                numHands = 1;
+            }
+            else if (numHands > MpudHandResult.MaxHands)
+            {
+                numHands = MpudHandResult.MaxHands;
+            }
+
             _modelPath = modelPath;
+            _numHands = numHands;
             _snapshot = new HandTrackingSnapshot();
             _timestampGenerator = new MonotonicTimestampGenerator();
 
@@ -53,6 +63,14 @@ namespace MediaPipeUnityDots.Runtime.Tracking
         public long LatestTimestampUs => _snapshot.TimestampUs;
 
         public long LatestFrameCount => _snapshot.FrameCount;
+
+        public int LatestHandCount => _snapshot.HandCount;
+
+        public int GetLatestHandedness(int hand) => _snapshot.GetHandedness(hand);
+
+        public float GetLatestScore(int hand) => _snapshot.GetScore(hand);
+
+        public int GetLatestLandmarkCount(int hand) => _snapshot.GetLandmarkCount(hand);
 
         /// <summary>
         /// 웹캠 프레임을 제출하고 결과를 폴링한다.
@@ -150,6 +168,15 @@ namespace MediaPipeUnityDots.Runtime.Tracking
         }
 
         /// <summary>
+        /// 지정 손의 최신 landmark를 caller-owned destination에 복사한다.
+        /// </summary>
+        public int CopyLatestHandLandmarksTo(int hand, MpudNormalizedLandmark[] destination)
+        {
+            ThrowIfDisposed();
+            return _snapshot.CopyHandLandmarksTo(hand, destination);
+        }
+
+        /// <summary>
         /// tracker를 destroy + recreate한다.
         /// snapshot, timestampGen, flipBuffer를 모두 초기화한다.
         /// timestamp generator reset은 이 경로에서만 수행한다.
@@ -180,13 +207,16 @@ namespace MediaPipeUnityDots.Runtime.Tracking
 
         private void CreateAndStartTracker()
         {
+            Debug.Assert(
+                Marshal.SizeOf<MpudHandResult>() == MpudHandResult.ExpectedSize,
+                "MpudHandResult ABI mismatch with native bridge.");
             var modelPathNative = MarshalStringToUtf8(_modelPath);
             try
             {
                 var config = new MpudHandTrackerConfig
                 {
                     modelAssetPath = modelPathNative,
-                    numHands = NumHands,
+                    numHands = _numHands,
                     minDetectionConfidence = MinDetectionConfidence,
                     minTrackingConfidence = MinTrackingConfidence,
                     runningMode = RunningModeVideo,
