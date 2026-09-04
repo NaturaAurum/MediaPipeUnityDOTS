@@ -1,0 +1,7 @@
+.webcam-toggle {
+    position: absolute;
+    left: 16px;
+    bottom: 16px;
+    font-size: 28px;
+    color: rgb(255, 255, 255);
+}

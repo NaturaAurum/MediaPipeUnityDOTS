@@ -224,6 +224,11 @@ namespace MediaPipeUnityDots.Sample.HandTracking.Scripts
             _lastCopiedTimestamp = 0;
         }
 
+        /// <summary>
+        /// 배경 렌더용 웹캠 텍스처. 초기화 전이거나 실패 시 null이다.
+        /// </summary>
+        public WebCamTexture VideoTexture => _webCamTexture;
+
         public void ResetTracker()
         {
             if (_service == null)

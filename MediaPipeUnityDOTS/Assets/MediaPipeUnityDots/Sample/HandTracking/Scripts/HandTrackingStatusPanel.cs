@@ -5,15 +5,19 @@ namespace MediaPipeUnityDots.Sample.HandTracking.Scripts
 {
     /// <summary>
     /// tracker 상태/프레임/타임스탬프/handedness/confidence를 보여주는 UI Toolkit 패널.
-    /// UXML/USS 에셋 없이 코드로 VisualElement를 구성하므로 씬 에셋 변경이 필요 없다.
+    /// 레이아웃은 StatusPanel.uxml/uss, C#은 바인딩만 담당한다.
     /// adapter DTO만 읽고 EntityManager에 직접 접근하지 않는다.
+    /// adapter/provider/panelRenderer는 씬에서 직렬화 참조로 배선한다.
     /// </summary>
-    /// UIDocument는 씬에 미리 배치하지 않고 OnEnable에서 추가한다.
-    /// UnityEngine 내장 스크립트 GUID를 씬 YAML에 하드코딩하지 않기 위함이다.
     public sealed class HandTrackingStatusPanel : MonoBehaviour
     {
+        [SerializeField]
         private HandTrackingAdapter _adapter;
+        [SerializeField]
         private WebcamFrameProvider _provider;
+        [SerializeField]
+        private PanelRenderer _panelRenderer;
+
         private readonly HandTrackingDto _dto = new HandTrackingDto();
 
         private Label _stateLabel;
@@ -24,55 +28,55 @@ namespace MediaPipeUnityDots.Sample.HandTracking.Scripts
 
         private void OnEnable()
         {
-            _adapter = FindAnyObjectByType<HandTrackingAdapter>();
-            _provider = FindAnyObjectByType<WebcamFrameProvider>();
-
-            var document = GetComponent<UIDocument>();
-            if (document == null)
+            if (_adapter == null || _provider == null || _panelRenderer == null)
             {
-                document = gameObject.AddComponent<UIDocument>();
-            }
-            if (document.panelSettings == null)
-            {
-                document.panelSettings = ScriptableObject.CreateInstance<PanelSettings>();
+                Debug.LogError("[MPUD] HandTrackingStatusPanel references are not wired in the scene.");
+                enabled = false;
+                return;
             }
 
-            var root = document.rootVisualElement;
-            root.Clear();
+            _panelRenderer.RegisterUIReloadCallback(OnUIReload);
+        }
 
-            var panel = new VisualElement
+        private void OnDisable()
+        {
+            if (_panelRenderer != null)
             {
-                style =
-                {
-                    position = Position.Absolute,
-                    top = 10,
-                    left = 10,
-                    paddingTop = 8,
-                    paddingBottom = 8,
-                    paddingLeft = 10,
-                    paddingRight = 10,
-                    backgroundColor = new Color(0f, 0f, 0f, 0.6f),
-                },
-            };
+                _panelRenderer.UnregisterUIReloadCallback(OnUIReload);
+            }
 
-            _stateLabel = AddLabel(panel, "state: -");
-            _frameLabel = AddLabel(panel, "frame: -");
-            _timestampLabel = AddLabel(panel, "timestamp: -");
-            _handednessLabel = AddLabel(panel, "hand: -");
-            _confidenceLabel = AddLabel(panel, "confidence: -");
+            _stateLabel = null;
+            _frameLabel = null;
+            _timestampLabel = null;
+            _handednessLabel = null;
+            _confidenceLabel = null;
+        }
 
-            var resetButton = new Button(OnResetClicked)
+        // version은 무시하고 매번 리바인딩한다. OnDisable에서 참조를 비우므로 가드 시 stale 위험이 있다.
+        private void OnUIReload(PanelRenderer renderer, VisualElement root, int version)
+        {
+            _stateLabel = root.Q<Label>("state-label");
+            _frameLabel = root.Q<Label>("frame-label");
+            _timestampLabel = root.Q<Label>("timestamp-label");
+            _handednessLabel = root.Q<Label>("hand-label");
+            _confidenceLabel = root.Q<Label>("confidence-label");
+
+            var resetButton = root.Q<Button>("reset-button");
+            if (resetButton != null)
             {
-                text = "Reset Tracker",
-            };
-            panel.Add(resetButton);
+                resetButton.clicked += OnResetClicked;
+            }
 
-            root.Add(panel);
+            if (_stateLabel == null || _frameLabel == null || _timestampLabel == null
+                || _handednessLabel == null || _confidenceLabel == null || resetButton == null)
+            {
+                Debug.LogError("[MPUD] StatusPanel.uxml is missing expected elements.");
+            }
         }
 
         private void LateUpdate()
         {
-            if (_adapter == null || !_adapter.TryRead(_dto))
+            if (_stateLabel == null || _adapter == null || !_adapter.TryRead(_dto))
             {
                 return;
             }
@@ -90,16 +94,6 @@ namespace MediaPipeUnityDots.Sample.HandTracking.Scripts
             {
                 _provider.ResetTracker();
             }
-        }
-
-        private static Label AddLabel(VisualElement parent, string text)
-        {
-            var label = new Label(text)
-            {
-                style = { color = Color.white, fontSize = 13 },
-            };
-            parent.Add(label);
-            return label;
         }
 
         private static string HandednessText(int handedness) => handedness switch
