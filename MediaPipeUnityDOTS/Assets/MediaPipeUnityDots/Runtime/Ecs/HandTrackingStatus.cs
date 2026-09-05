@@ -1,3 +1,4 @@
+using Unity.Collections;
 using Unity.Entities;
 
 namespace MediaPipeUnityDots.Runtime.Ecs
@@ -6,6 +7,9 @@ namespace MediaPipeUnityDots.Runtime.Ecs
     {
         public bool IsValid;
         public int Handedness;
+        public int HandCount;
+        public FixedList32Bytes<int> HandednessList;
+        public FixedList32Bytes<float> ScoreList;
         public float Score;
         public int LandmarkCount;
         public long TimestampUs;

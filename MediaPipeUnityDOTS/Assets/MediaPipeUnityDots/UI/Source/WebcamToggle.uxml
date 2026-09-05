@@ -1,0 +1,4 @@
+<UXML xmlns="UnityEngine.UIElements">
+    <Style src="WebcamToggle.uss" />
+    <Toggle name="webcam-toggle" label="Webcam 배경" value="true" class="webcam-toggle" />
+</UXML>

@@ -46,21 +46,31 @@ typedef struct MpudNormalizedLandmark {
 } MpudNormalizedLandmark;
 
 // 결과 계약:
-//   is_valid=1: 손 감지됨. landmarks, handedness, score 유효.
-//   is_valid=0: 손 미감지. timestamp_us만 유효 (프레임 처리 완료 확인용).
-typedef struct MpudHandResult {
-    int is_valid;
+//   hand_count>0: 손 감지됨. hands[0..hand_count) 유효.
+//   hand_count=0: 손 미감지. timestamp_us만 유효 (프레임 처리 완료 확인용).
+//   hand_landmarks/handedness는 MediaPipe 반환 순서대로 같은 인덱스에 정렬됨.
+#define MPUD_MAX_HANDS 4
+#define MPUD_LANDMARKS_PER_HAND 21
+typedef struct MpudHand {
     int landmark_count;
     int handedness;     // 0 = Left, 1 = Right
     float score;
+    MpudNormalizedLandmark landmarks[MPUD_LANDMARKS_PER_HAND];
+} MpudHand;
+typedef struct MpudHandResult {
+    int hand_count;
     long long timestamp_us;
-    MpudNormalizedLandmark landmarks[21];
+    MpudHand hands[MPUD_MAX_HANDS];
 } MpudHandResult;
+
+// ABI 고정: C# MpudHandResult와 바이트 일치해야 함. 깨지면 양쪽 static assert가 잡는다.
+_Static_assert(sizeof(MpudHand) == 432, "MpudHand layout changed");
+_Static_assert(sizeof(MpudHandResult) == 1744, "MpudHandResult layout changed");
 
 // --- Config ---
 typedef struct MpudHandTrackerConfig {
     const char* model_asset_path;   // .task 파일의 절대 경로 (null/empty 시 MPUD_ERROR)
-    int num_hands;                  // PoC에서는 1 고정
+    int num_hands;                  // 1..MPUD_MAX_HANDS, 범위 밖은 클램프됨
     float min_detection_confidence;
     float min_tracking_confidence;
     int running_mode;               // PoC: 무시됨. 내부적으로 VIDEO(1) 고정. 향후 확장 예약.

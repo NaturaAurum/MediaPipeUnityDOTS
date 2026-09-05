@@ -24,6 +24,7 @@
 ## UI / ECS Boundary
 
 - **UI Stack**: `UI Toolkit + MVVM + R3 + UniTask + VContainer` is allowed.
+- **UI Definition**: Manage UI Toolkit layout and styles in `.uxml`/`.uss` files instead of C# code; keep C# for binding and behavior only.
 - **Boundary Rule**: Use that stack only in the UI / App layer. Keep ECS core (`IComponentData`, job data, system data flow) as unmanaged pure data.
 - **Do Not Put In ECS**: Do not place `ReactiveProperty`, `UniTask`, DI references, or ViewModel references inside ECS component data or job data.
 - **Integration Rule**: UI/App -> ECS uses command or request push. ECS -> UI/App uses snapshot, presenter, or ViewModel update.
@@ -34,6 +35,7 @@
 - **Naming**: `PascalCase` (Class/Method/Prop/Const), `camelCase` (Var/Param), `_camelCase` (Private), `IInterface`.
 - **Format**: 4 spaces indent, LF style. See `MediaPipeUnityDOTS/.editorconfig` for details.
 - **Patterns**: MVVM for UI/App code, data-oriented design for Unity DOTS / ECS runtime
+- **Explicit Wiring**: Avoid `Find*`, `AddComponent`, and `GetComponent` in new code; wire references via `[SerializeField]` or VContainer instead. Verify: grep touched files for the avoided calls.
 - **Structure**:
   - `MediaPipeUnityDOTS/Assets/MediaPipeUnityDots/Runtime/`: Plugin runtime code
   - `MediaPipeUnityDOTS/Assets/MediaPipeUnityDots/EditorTool/`: Editor-side utility code

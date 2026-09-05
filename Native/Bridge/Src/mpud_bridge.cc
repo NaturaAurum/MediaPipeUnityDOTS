@@ -57,7 +57,9 @@ MPUD_EXPORT int mpud_create_hand_tracker(
 
     auto options = std::make_unique<mp_hl::HandLandmarkerOptions>();
     options->base_options.model_asset_path = config->model_asset_path;
-    options->num_hands = config->num_hands;
+    int num_hands = config->num_hands < 1 ? 1 : config->num_hands;
+    if (num_hands > MPUD_MAX_HANDS) num_hands = MPUD_MAX_HANDS;
+    options->num_hands = num_hands;
     options->min_hand_detection_confidence = config->min_detection_confidence;
     options->min_tracking_confidence = config->min_tracking_confidence;
 
@@ -155,29 +157,36 @@ MPUD_EXPORT int mpud_submit_frame(
     // 손 감지 여부와 무관하게 timestamp_us를 기록 (프레임 기반 추적용)
     out->timestamp_us = frame->timestamp_us;
 
-    if (!hand_result.hand_landmarks.empty()) {
-        out->is_valid = 1;
-        const auto& lm_list = hand_result.hand_landmarks[0];
-        out->landmark_count = (int)lm_list.landmarks.size();
-        if (out->landmark_count > 21) out->landmark_count = 21;
-
-        for (int i = 0; i < out->landmark_count; ++i) {
-            const auto& lm = lm_list.landmarks[i];
-            out->landmarks[i].x = lm.x;
-            out->landmarks[i].y = lm.y;
-            out->landmarks[i].z = lm.z;
-            out->landmarks[i].visibility = lm.visibility.value_or(0.0f);
-            out->landmarks[i].presence = lm.presence.value_or(0.0f);
+    int hand_total = (int)hand_result.hand_landmarks.size();
+    if (hand_total > MPUD_MAX_HANDS) hand_total = MPUD_MAX_HANDS;
+    out->hand_count = hand_total;
+    for (int h = 0; h < hand_total; ++h) {
+        const auto& lm_list = hand_result.hand_landmarks[h];
+        MpudHand* hand = &out->hands[h];
+        hand->landmark_count = (int)lm_list.landmarks.size();
+        if (hand->landmark_count > MPUD_LANDMARKS_PER_HAND) {
+            hand->landmark_count = MPUD_LANDMARKS_PER_HAND;
         }
 
-        if (!hand_result.handedness.empty() &&
-            !hand_result.handedness[0].categories.empty()) {
-            const auto& cat = hand_result.handedness[0].categories[0];
-            out->handedness = (cat.category_name == "Left") ? 0 : 1;
-            out->score = cat.score;
+        for (int i = 0; i < hand->landmark_count; ++i) {
+            const auto& lm = lm_list.landmarks[i];
+            hand->landmarks[i].x = lm.x;
+            hand->landmarks[i].y = lm.y;
+            hand->landmarks[i].z = lm.z;
+            hand->landmarks[i].visibility = lm.visibility.value_or(0.0f);
+            hand->landmarks[i].presence = lm.presence.value_or(0.0f);
+        }
+
+        hand->handedness = 1;
+        hand->score = 0.0f;
+        if (h < (int)hand_result.handedness.size() &&
+            !hand_result.handedness[h].categories.empty()) {
+            const auto& cat = hand_result.handedness[h].categories[0];
+            hand->handedness = (cat.category_name == "Left") ? 0 : 1;
+            hand->score = cat.score;
         }
     }
-    // is_valid=0이면 손 미감지. timestamp_us는 유효 → C#에서 "최신 프레임이지만 손 없음" 판별 가능.
+    // hand_count=0이면 손 미감지. timestamp_us는 유효 → C#에서 "최신 프레임이지만 손 없음" 판별 가능.
 
     tracker->has_result = true;
     return MPUD_OK;

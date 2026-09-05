@@ -1,0 +1,11 @@
+<UXML xmlns="UnityEngine.UIElements">
+    <Style src="StatusPanel.uss" />
+    <VisualElement name="status-panel" class="status-panel">
+        <Label name="state-label" text="state: -" />
+        <Label name="frame-label" text="frame: -" />
+        <Label name="timestamp-label" text="timestamp: -" />
+        <Label name="hand-label" text="hand: -" />
+        <Label name="confidence-label" text="confidence: -" />
+        <Button name="reset-button" text="Reset Tracker" />
+    </VisualElement>
+</UXML>

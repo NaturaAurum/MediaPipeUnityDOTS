@@ -17,6 +17,7 @@ namespace MediaPipeUnityDots.Runtime.Ecs
         private const float WorldHeight = 1.5f;
         private const float DepthScale = 1f;
         private const float PointScale = 0.05f;
+        private const int MaxLandmarksPerHand = 21;
 
         public void OnCreate(ref SystemState state)
         {
@@ -33,10 +34,15 @@ namespace MediaPipeUnityDots.Runtime.Ecs
             foreach ((var transform, var point)
                 in SystemAPI.Query<RefRW<LocalTransform>, RefRO<HandLandmarkPoint>>())
             {
+                var hand = point.ValueRO.HandIndex;
                 var index = point.ValueRO.Index;
-                if (status.IsValid && index >= 0 && index < landmarks.Length)
+                var bufferIndex = hand * MaxLandmarksPerHand + index;
+                if (status.IsValid && hand >= 0 && hand < status.HandCount
+                    && index >= 0 && index < MaxLandmarksPerHand
+                    && bufferIndex >= 0 && bufferIndex < landmarks.Length
+                    && landmarks[bufferIndex].HandIndex == hand)
                 {
-                    var element = landmarks[index];
+                    var element = landmarks[bufferIndex];
                     transform.ValueRW = LocalTransform.FromPositionRotationScale(
                         new float3(
                             (element.X - 0.5f) * WorldWidth,
