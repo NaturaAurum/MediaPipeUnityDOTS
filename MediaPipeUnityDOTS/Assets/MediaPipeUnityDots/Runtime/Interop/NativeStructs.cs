@@ -301,8 +301,8 @@ namespace MediaPipeUnityDots.Runtime.Interop
         public int leftHandLandmarkCount;
         public int rightHandLandmarkCount;
         public long timestampUs;
-        public fixed float landmarkData[FaceFloats + PoseFloats + HandFloats * 2];
-
+        public fixed float landmarkData[
+            FaceFloats + PoseFloats + HandFloats * 2 + PoseWorldFloats + HandWorldFloats * 2];
         public MpudNormalizedLandmark GetFaceLandmark(int i)
         {
             return GetLandmark(0, FaceLandmarks, faceLandmarkCount, i);
