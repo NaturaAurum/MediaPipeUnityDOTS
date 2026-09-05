@@ -199,8 +199,8 @@ namespace MediaPipeUnityDots.Sample.HandTracking.Scripts
         private void OnEnabledToggleChanged(ChangeEvent<bool> evt)
         {
             _settings.Enabled = evt.newValue ? 1 : 0;
-            Debug.Log($"[MPUD] OneEuroFilter enabled: {_settings.Enabled != 0}");
             PushSettingsToEcs();
+            LogEcsReadback("toggle");
         }
 
         private void OnHandMinCutoffChanged(ChangeEvent<float> evt)
@@ -266,6 +266,20 @@ namespace MediaPipeUnityDots.Sample.HandTracking.Scripts
             }
         }
 
+        private void LogEcsReadback(string reason)
+        {
+            if (TryGetSettingsEntity(out var entityManager, out var entity))
+            {
+                var echoed = entityManager.GetComponentData<OneEuroFilterSettings>(entity);
+                Debug.Log($"[MPUD] OneEuroFilter {reason}: pushed Enabled={_settings.Enabled}, " +
+                    $"ecs Enabled={echoed.Enabled}, HandMinCutoff={echoed.HandMinCutoff}");
+            }
+            else
+            {
+                Debug.LogWarning("[MPUD] OneEuroFilter push skipped: no ECS world.");
+            }
+        }
+
         private bool TryGetSettingsEntity(out EntityManager entityManager, out Entity entity)
         {
             entityManager = default;
@@ -277,7 +291,8 @@ namespace MediaPipeUnityDots.Sample.HandTracking.Scripts
                 return false;
             }
 
-            if (_cachedWorld != world || _settingsEntity == Entity.Null)
+            if (_cachedWorld != world || _settingsEntity == Entity.Null
+                || !world.EntityManager.Exists(_settingsEntity))
             {
                 _cachedWorld = world;
                 _settingsEntity = Entity.Null;
@@ -299,12 +314,6 @@ namespace MediaPipeUnityDots.Sample.HandTracking.Scripts
                     _settingsEntity = world.EntityManager.CreateEntity(typeof(OneEuroFilterSettings));
                     world.EntityManager.SetComponentData(_settingsEntity, _settings);
                 }
-            }
-
-            if (!world.EntityManager.Exists(_settingsEntity))
-            {
-                _settingsEntity = Entity.Null;
-                return false;
             }
 
             entityManager = world.EntityManager;
