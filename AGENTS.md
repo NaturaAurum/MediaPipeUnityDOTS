@@ -47,7 +47,7 @@
 
 - **Safety**: No magic numbers. Dispose events properly. Use `Debug.LogError` for errors.
 - **Serialized Rename Policy**: When renaming a `MonoBehaviour` field exposed in Inspector (`public` or `[SerializeField]`), do not use `FormerlySerializedAsAttribute`; update affected prefab serialized data in the same change.
-- **Git**: Use Git Flow (`feature/`, `bugfix/`).
+- **Git**: Use Git Flow (`feature/`, `bugfix/`). Merge PRs with Squash only (`gh pr merge --squash`). Verify: merged PR adds exactly one commit to `main`.
 - **Modifications**: Keep changes minimal. Update tests. Match existing styles.
 
 ## Evaluation Loop (Mandatory Per Task)
