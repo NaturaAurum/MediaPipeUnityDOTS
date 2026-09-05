@@ -4,6 +4,7 @@
     right: 16px;
     width: 320px;
     background-color: rgba(20, 20, 24, 0.88);
+    picking-mode: position;
     border-top-left-radius: 8px;
     border-top-right-radius: 8px;
     border-bottom-left-radius: 8px;

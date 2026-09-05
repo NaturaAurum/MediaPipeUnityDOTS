@@ -37,11 +37,21 @@ namespace MediaPipeUnityDots.Sample.HandTracking.Scripts
                 _panelRenderer.UnregisterUIReloadCallback(OnUIReload);
             }
 
-            _toggle = null;
+            UnbindEvents();
         }
-        // panel과 동일하게 version 무시 리바인딩.
+
         private void OnUIReload(PanelRenderer renderer, VisualElement root, int version)
         {
+            UnbindEvents();
+
+            if (root == null)
+            {
+                return;
+            }
+
+            // 투명 캔버스가 하위 패널의 마우스 클릭을 가로채지 않도록 Ignore 처리
+            root.pickingMode = PickingMode.Ignore;
+
             _toggle = root.Q<Toggle>(ToggleElementName);
             if (_toggle == null)
             {
@@ -49,12 +59,23 @@ namespace MediaPipeUnityDots.Sample.HandTracking.Scripts
                 return;
             }
 
-            _toggle.SetValueWithoutNotify(true);
+            var currentVisible = _renderer != null && _renderer.IsVisible;
+            _toggle.SetValueWithoutNotify(currentVisible);
             _toggle.RegisterValueChangedCallback(OnToggleChanged);
+        }
+
+        private void UnbindEvents()
+        {
+            if (_toggle != null)
+            {
+                _toggle.UnregisterValueChangedCallback(OnToggleChanged);
+                _toggle = null;
+            }
         }
 
         private void OnToggleChanged(ChangeEvent<bool> evt)
         {
+            Debug.Log($"[MPUD] Webcam background visible: {evt.newValue}");
             if (_renderer != null)
             {
                 _renderer.SetVisible(evt.newValue);

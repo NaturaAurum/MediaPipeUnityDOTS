@@ -31,6 +31,7 @@ namespace MediaPipeUnityDots.Sample.HandTracking.Scripts
 
         private Material _material;
         private bool _visible = true;
+        public bool IsVisible => _visible;
 
         public void SetVisible(bool visible)
         {

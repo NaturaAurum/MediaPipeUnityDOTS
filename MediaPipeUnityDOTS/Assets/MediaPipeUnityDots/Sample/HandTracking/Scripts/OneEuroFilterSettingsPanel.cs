@@ -72,6 +72,9 @@ namespace MediaPipeUnityDots.Sample.HandTracking.Scripts
                 return;
             }
 
+            // 투명 캔버스가 하위 패널의 마우스 클릭을 가로채지 않도록 Ignore 처리
+            root.pickingMode = PickingMode.Ignore;
+
             _panelElement = root.Q<VisualElement>("filter-settings-panel");
             if (_panelElement == null && _settingsUxml != null)
             {
@@ -196,6 +199,7 @@ namespace MediaPipeUnityDots.Sample.HandTracking.Scripts
         private void OnEnabledToggleChanged(ChangeEvent<bool> evt)
         {
             _settings.Enabled = evt.newValue ? 1 : 0;
+            Debug.Log($"[MPUD] OneEuroFilter enabled: {_settings.Enabled != 0}");
             PushSettingsToEcs();
         }
 
