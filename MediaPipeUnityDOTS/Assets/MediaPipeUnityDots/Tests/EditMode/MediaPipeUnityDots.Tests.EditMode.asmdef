@@ -1,0 +1,21 @@
+{
+  "name": "MediaPipeUnityDots.Tests.EditMode",
+  "rootNamespace": "MediaPipeUnityDots.Tests.EditMode",
+  "references": [
+    "MediaPipeUnityDots.Runtime"
+  ],
+  "includePlatforms": [
+    "Editor"
+  ],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": false,
+  "precompiledReferences": [],
+  "autoReferenced": false,
+  "defineConstraints": [],
+  "versionDefines": [],
+  "noEngineReferences": false,
+  "optionalUnityReferences": [
+    "TestAssemblies"
+  ]
+}
