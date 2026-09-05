@@ -8,9 +8,9 @@ Unity DOTS (ECS + Jobs) 환경에서 MediaPipe를 성능 우선으로 통합하�
 
 ## Current Status
 
-- Unity 버전: `6000.3.10f1`
-- **Phase 1 (Native Bridge) 완료**: macOS Apple Silicon 전용 C ABI bridge 빌드 및 Unity Editor 검증 통과
-- Phase 2 이후 (웹캠 캡처 → ECS 연동 → 시각화) 는 미착수
+- Unity 버전: `6000.6.0f1`
+- **Phase 1 (Native Bridge) 완료**: macOS Apple Silicon 전용 C ABI bridge 빌드 및 Unity Editor 검증 통과 (Hand/Face/Pose/Holistic 4종)
+- **Phase 2 (웹캠 캡처 → ECS 연동 → 시각화) 완료**: 웹캠 입력, ECS 싱글턴/버퍼 푸시, 배경 정합 오버레이, 1 Euro Filter, UI Toolkit 튜닝 패널까지 동작
 
 ## Repository Layout
 
@@ -21,25 +21,29 @@ Unity DOTS (ECS + Jobs) 환경에서 MediaPipe를 성능 우선으로 통합하�
 ├── MediaPipeUnityDOTS/        # Unity project root
 │   ├── Assets/
 │   │   ├── MediaPipeUnityDots/
-│   │   │   ├── Runtime/
-│   │   │   ├── Sample/
+│   │   │   ├── Runtime/       # Ecs, Tracking, Interop, Input, Logging
+│   │   │   ├── Sample/        # Providers, spawners, UI panels
+│   │   │   ├── Tests/         # EditMode regression tests
+│   │   │   ├── UI/            # .uxml / .uss sources
 │   │   │   └── EditorTool/
 │   │   ├── Plugins/
-│   │   └── Scenes/
+│   │   └── Scenes/            # SampleScene.unity
 │   ├── Packages/
 │   └── ProjectSettings/
+├── BRANCH_RULE.md             # Branch flow and PR rules
+├── MVVM.md                    # MVVM + Rx conventions
 └── README.md
 ```
 
-저장소 루트에 문서와 네이티브 브리지 소스를 두고, Unity 프로젝트는 별도 하위 폴더에서 관리합니다. 구조 상세는 [`Docs/FolderStructure.md`](./Docs/FolderStructure.md) 참고.
+저장소 루트에 문서와 네이티브 브리지 소스를 두고, Unity 프로젝트는 별도 하위 폴더에서 관리합니다. 구조 상세는 [`Docs/FolderStructure.md`](./Docs/FolderStructure.md) 참고. 브랜치/PR 규칙은 [`BRANCH_RULE.md`](./BRANCH_RULE.md) 참고 (기본 타겟 `develop`).
 
 ## Quick Start
 
 ```bash
-# 1. clone + submodule
-git clone --recurse-submodules <repo-url>
+# 1. clone + submodule (develop 기준)
+git clone --recurse-submodules <repo-url> && git checkout develop
 
-# 2. 모델 다운로드
+# 2. 모델 다운로드 (4종 task bundle)
 Native/Build/DownloadModels.sh
 
 # 3. 네이티브 빌드 (macOS Apple Silicon)
@@ -52,6 +56,18 @@ Native/Build/CopyArtifactsToUnity.sh
 ```
 
 빌드 상세 및 필수 도구는 [`Native/README.md`](./Native/README.md) 참고.
+
+## Runtime Pipeline
+
+```text
+WebcamTexture → FrameProvider → TrackingService → ECS singleton/buffer
+    → RenderSystem (1 Euro Filter → Overlay Mapping) → Entities Graphics 구체
+    → 배경 Quad (WebcamBackgroundRenderer, cover-crop 정합)
+```
+
+- 필터 파라미터는 SampleScene 우측 상단 패널(UI Toolkit)에서 실시간 조절. 설정은 `OneEuroFilterSettings` 싱글턴으로 푸시.
+- 주기성 로그는 `MpudLog` 단일 진입점 + 패널의 "상세 로그" 토글로 On/Off.
+- 회귀 테스트: `Assets/MediaPipeUnityDots/Tests/EditMode` (EditMode Test Runner).
 
 ## Native → Unity 산출물 흐름
 
@@ -70,8 +86,8 @@ C# DllImport("mpud_bridge")  ← Unity가 lib 접두사와 .dylib 확장자를 �
 | dylib (빌드 결과)      | `Native/Artifacts/MacosEditor/libmpud_bridge.dylib`                 | ✗ gitignore |
 | dylib (Unity 플러그인) | `Assets/Plugins/macOS/libmpud_bridge.dylib`                         | ✗ gitignore |
 | dylib .meta            | `Assets/Plugins/macOS/libmpud_bridge.dylib.meta`                    | ✓ 추적      |
-| 모델 파일              | `Assets/StreamingAssets/MediaPipe/Models/hand_landmarker.task`      | ✗ gitignore |
-| 모델 .meta             | `Assets/StreamingAssets/MediaPipe/Models/hand_landmarker.task.meta` | ✓ 추적      |
+| 모델 파일              | `Assets/StreamingAssets/MediaPipe/Models/*.task` (4종)              | ✗ gitignore |
+| 모델 .meta             | `Assets/StreamingAssets/MediaPipe/Models/*.task.meta`               | ✓ 추적      |
 
 > `.dylib`와 `.task`는 용량이 크므로 git에서 제외합니다. clone 후 빌드/다운로드 스크립트로 재생성합니다.
 
@@ -85,8 +101,8 @@ C# DllImport("mpud_bridge")  ← Unity가 lib 접두사와 .dylib 확장자를 �
 
 ```
 Assets/MediaPipeUnityDots/Runtime/Interop/
-├── NativeStructs.cs    ← C 구조체 미러 (MpudHandResult, MpudImageFrame 등)
-└── MpudBridge.cs       ← DllImport 선언 (6개 함수)
+├── NativeStructs.cs    ← C 구조체 미러 (Hand/Face/Pose/Holistic 결과, 이미지 프레임 등)
+└── MpudBridge.cs       ← DllImport 선언 (4종 트래커 × create/submit/poll/destroy + 에러 조회)
 ```
 
 ## Direction
@@ -107,3 +123,6 @@ Assets/MediaPipeUnityDots/Runtime/Interop/
 
 - Native intake and build path: [`Docs/MediaPipeNativeIntegrationPlan.md`](./Docs/MediaPipeNativeIntegrationPlan.md)
 - First implementation slice: [`Docs/MediaPipePoCExecutionPlan.md`](./Docs/MediaPipePoCExecutionPlan.md)
+- World mapping: [`Docs/transform-to-unity-world.md`](./Docs/transform-to-unity-world.md)
+- Noise filtering: [`Docs/landmark-noise-filtering.md`](./Docs/landmark-noise-filtering.md)
+- DOTS best practices: [`Docs/dots-job-system-best-practices.md`](./Docs/dots-job-system-best-practices.md)
