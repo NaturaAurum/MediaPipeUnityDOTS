@@ -1,5 +1,4 @@
 using MediaPipeUnityDots.Runtime.Ecs;
-using MediaPipeUnityDots.Runtime.Logging;
 using Unity.Entities;
 using UnityEngine;
 using UnityEngine.UIElements;
