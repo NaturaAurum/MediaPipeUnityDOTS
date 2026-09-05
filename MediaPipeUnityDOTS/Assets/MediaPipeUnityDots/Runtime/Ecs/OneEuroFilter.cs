@@ -28,11 +28,18 @@ namespace MediaPipeUnityDots.Runtime.Ecs
         public static float3 Filter(
             float3 current,
             ref LandmarkFilterState state,
+            int enabled,
             float3 minCutoffHz,
             float3 beta,
             float derivativeCutoffHz,
             long timestampUs)
         {
+            if (enabled == 0)
+            {
+                state.Initialized = 0;
+                return current;
+            }
+
             if (state.Initialized != 0 && timestampUs == state.LastTimestampUs)
             {
                 return state.PrevFiltered;

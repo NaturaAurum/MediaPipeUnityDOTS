@@ -51,23 +51,15 @@ namespace MediaPipeUnityDots.Runtime.Ecs
                     && landmarks[bufferIndex].HandIndex == hand)
                 {
                     var element = landmarks[bufferIndex];
-                    float3 targetPos;
-                    if (filterSettings.Enabled != 0)
-                    {
-                        var filtered = OneEuroFilter.Filter(
-                            new float3(element.X, element.Y, element.Z),
-                            ref filter.ValueRW,
-                            minCutoff,
-                            beta,
-                            filterSettings.DerivativeCutoffHz,
-                            inputTimestampUs);
-                        targetPos = LandmarkOverlayMapping.Map(filtered.x, filtered.y, in mapping);
-                    }
-                    else
-                    {
-                        filter.ValueRW.Initialized = 0;
-                        targetPos = LandmarkOverlayMapping.Map(element.X, element.Y, in mapping);
-                    }
+                    var filtered = OneEuroFilter.Filter(
+                        new float3(element.X, element.Y, element.Z),
+                        ref filter.ValueRW,
+                        filterSettings.Enabled,
+                        minCutoff,
+                        beta,
+                        filterSettings.DerivativeCutoffHz,
+                        inputTimestampUs);
+                    var targetPos = LandmarkOverlayMapping.Map(filtered.x, filtered.y, in mapping);
 
                     transform.ValueRW = LocalTransform.FromPositionRotationScale(
                         targetPos,
