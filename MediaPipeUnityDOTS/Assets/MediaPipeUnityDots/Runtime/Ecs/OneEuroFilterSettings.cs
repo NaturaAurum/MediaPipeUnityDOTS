@@ -10,6 +10,9 @@ namespace MediaPipeUnityDots.Runtime.Ecs
     {
         public int Enabled;
 
+        // 0 = 2D overlay (정규화), 1 = 3D world (미터). Face는 월드 미지원이라 2D 폴백.
+        public int RenderMode;
+
         // Hand
         public float HandMinCutoff;
         public float HandBeta;
@@ -30,6 +33,7 @@ namespace MediaPipeUnityDots.Runtime.Ecs
         public static OneEuroFilterSettings Default => new()
         {
             Enabled = 1,
+            RenderMode = 0,
             HandMinCutoff = 1.0f,
             HandBeta = 0.007f,
             FaceMinCutoff = 0.6f,
