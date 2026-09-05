@@ -63,15 +63,9 @@ namespace MediaPipeUnityDots.Runtime.Ecs
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private static float ComputeAlpha(float cutoffHz, float dt)
-        {
-            return 1f / (1f + (1f / (2f * math.PI * cutoffHz)) / dt);
-        }
+        private static float ComputeAlpha(float cutoffHz, float dt) => 1f / (1f + (1f / (2f * math.PI * cutoffHz)) / dt);
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private static float3 ComputeAlpha(float3 cutoffHz, float dt)
-        {
-            return 1f / (1f + (1f / (2f * math.PI * cutoffHz)) / dt);
-        }
+        private static float3 ComputeAlpha(float3 cutoffHz, float dt) => 1f / (1f + (1f / (2f * math.PI * cutoffHz)) / dt);
     }
 }
