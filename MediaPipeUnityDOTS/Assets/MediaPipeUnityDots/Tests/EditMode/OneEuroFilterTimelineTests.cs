@@ -31,7 +31,7 @@ namespace MediaPipeUnityDots.Tests.EditMode
             for (long frame = 0; frame < 60; frame++)
             {
                 expected[frame] = OneEuroFilter.Filter(
-                    Sample(frame), ref state30, MinCutoffHz, Beta, DerivativeCutoffHz, frame * StepUs);
+                    Sample(frame), ref state30, 1, MinCutoffHz, Beta, DerivativeCutoffHz, frame * StepUs);
             }
 
             var state120 = new LandmarkFilterState();
@@ -40,7 +40,7 @@ namespace MediaPipeUnityDots.Tests.EditMode
                 for (var repeat = 0; repeat < 4; repeat++)
                 {
                     var actual = OneEuroFilter.Filter(
-                        Sample(frame), ref state120, MinCutoffHz, Beta, DerivativeCutoffHz, frame * StepUs);
+                        Sample(frame), ref state120, 1, MinCutoffHz, Beta, DerivativeCutoffHz, frame * StepUs);
                     Assert.AreEqual(expected[frame].x, actual.x, 1e-6f, $"frame={frame} repeat={repeat} x");
                     Assert.AreEqual(expected[frame].y, actual.y, 1e-6f, $"frame={frame} repeat={repeat} y");
                     Assert.AreEqual(expected[frame].z, actual.z, 1e-6f, $"frame={frame} repeat={repeat} z");
@@ -52,13 +52,14 @@ namespace MediaPipeUnityDots.Tests.EditMode
         public void RepeatedTimestamp_DoesNotAdvanceFilterState()
         {
             var state = new LandmarkFilterState();
-            var first = OneEuroFilter.Filter(new float3(1f), ref state, MinCutoffHz, Beta, DerivativeCutoffHz, StepUs);
+            var first = OneEuroFilter.Filter(
+                new float3(1f), ref state, 1, MinCutoffHz, Beta, DerivativeCutoffHz, StepUs);
             var snapshot = state;
 
             for (var i = 0; i < 10; i++)
             {
                 var repeated = OneEuroFilter.Filter(
-                    new float3(99f), ref state, MinCutoffHz, Beta, DerivativeCutoffHz, StepUs);
+                    new float3(99f), ref state, 1, MinCutoffHz, Beta, DerivativeCutoffHz, StepUs);
                 Assert.AreEqual(first.x, repeated.x, 1e-6f);
             }
 
@@ -70,11 +71,33 @@ namespace MediaPipeUnityDots.Tests.EditMode
         public void TimestampReset_ReinitializesWithoutPull()
         {
             var state = new LandmarkFilterState();
-            OneEuroFilter.Filter(new float3(1f), ref state, MinCutoffHz, Beta, DerivativeCutoffHz, 10 * StepUs);
+            OneEuroFilter.Filter(
+                new float3(1f), ref state, 1, MinCutoffHz, Beta, DerivativeCutoffHz, 10 * StepUs);
 
-            var afterReset = OneEuroFilter.Filter(new float3(5f), ref state, MinCutoffHz, Beta, DerivativeCutoffHz, 0L);
+            var afterReset = OneEuroFilter.Filter(
+                new float3(5f), ref state, 1, MinCutoffHz, Beta, DerivativeCutoffHz, 0L);
             Assert.AreEqual(5f, afterReset.x, 1e-6f);
             Assert.AreEqual(0L, state.LastTimestampUs);
+        }
+
+        [Test]
+        public void Disabled_BypassesAndResetsFilterState()
+        {
+            var state = new LandmarkFilterState();
+            OneEuroFilter.Filter(
+                new float3(1f), ref state, 1, MinCutoffHz, Beta, DerivativeCutoffHz, StepUs);
+
+            var raw = new float3(7f, 8f, 9f);
+            var bypassed = OneEuroFilter.Filter(
+                raw, ref state, 0, MinCutoffHz, Beta, DerivativeCutoffHz, 2 * StepUs);
+
+            Assert.AreEqual(raw, bypassed);
+            Assert.AreEqual(0, state.Initialized);
+
+            var reenabled = OneEuroFilter.Filter(
+                raw, ref state, 1, MinCutoffHz, Beta, DerivativeCutoffHz, 3 * StepUs);
+            Assert.AreEqual(raw, reenabled);
+            Assert.AreEqual(1, state.Initialized);
         }
 
         [Test]
