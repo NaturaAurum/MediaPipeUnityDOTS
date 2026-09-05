@@ -1,7 +1,6 @@
 using System;
 using System.IO;
 using MediaPipeUnityDots.Runtime.Ecs;
-using MediaPipeUnityDots.Runtime.Logging;
 using MediaPipeUnityDots.Runtime.Interop;
 using MediaPipeUnityDots.Runtime.Tracking;
 using Unity.Entities;

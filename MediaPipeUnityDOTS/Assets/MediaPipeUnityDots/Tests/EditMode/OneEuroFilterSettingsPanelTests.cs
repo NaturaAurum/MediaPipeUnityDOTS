@@ -1,5 +1,4 @@
 using MediaPipeUnityDots.Sample.HandTracking.Scripts;
-using MediaPipeUnityDots.Runtime.Logging;
 using NUnit.Framework;
 using UnityEngine;
 using UnityEngine.UIElements;
