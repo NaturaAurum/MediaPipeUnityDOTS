@@ -136,3 +136,21 @@ MediaPipeUnityDOTS/
   네이티브 `static_assert` + C# `ExpectedSize` + `NativeAbiTests`.
 - `Runtime`에 UI(App 레이어) 의존을 넣지 않는다
   (R3/UniTask/VContainer/UI Toolkit 금지 — AGENTS.md UI/ECS 경계).
+
+## package.json 계획 (UPM 분리 시점)
+
+- 위치: `Assets/MediaPipeUnityDots/package.json` (임베디드 패키지 루트).
+- `name` 가칭: `com.natura-aurum.mediapipe-unity-dots`, `unity` 최소 `6000.0`
+  (검증 환경 `6000.6.0f1`).
+- `dependencies` (잠금 버전 기준, `packages-lock.json` 실측):
+  - `com.unity.burst`: `2.0.0`
+  - `com.unity.collections`: `6.6.0`
+  - `com.unity.entities`: `6.6.0`
+  - `com.unity.mathematics`: `1.4.0`
+  - `com.unity.entities.graphics`: `6.6.0` — 조건부. 현재 Runtime C#에서
+    직접 사용하지 않으므로 스포너 승격 시에만 포함.
+- 포함하지 않는다: R3/UniTask/VContainer (git URL 의존성 + App 전용),
+  URP, 테스트·프로파일러·IDE 등 에디터 전용 패키지.
+- 레이아웃 변경: `Sample/` → `Samples~/` (UPM 샘플 관례),
+  `Assets/Plugins`의 네이티브 바이너리는 패키지 내
+  `Runtime/Plugins/<platform>/` 로 이동.
