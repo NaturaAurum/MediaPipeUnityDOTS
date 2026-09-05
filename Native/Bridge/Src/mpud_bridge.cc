@@ -177,6 +177,21 @@ MPUD_EXPORT int mpud_submit_frame(
             hand->landmarks[i].presence = lm.presence.value_or(0.0f);
         }
 
+        if (h < (int)hand_result.hand_world_landmarks.size()) {
+            const auto& world_list = hand_result.hand_world_landmarks[h];
+            int world_count = (int)world_list.landmarks.size();
+            if (world_count > MPUD_LANDMARKS_PER_HAND) world_count = MPUD_LANDMARKS_PER_HAND;
+            if (world_count > hand->landmark_count) world_count = hand->landmark_count;
+            for (int i = 0; i < world_count; ++i) {
+                const auto& wlm = world_list.landmarks[i];
+                hand->world_landmarks[i].x = wlm.x;
+                hand->world_landmarks[i].y = wlm.y;
+                hand->world_landmarks[i].z = wlm.z;
+                hand->world_landmarks[i].visibility = wlm.visibility.value_or(0.0f);
+                hand->world_landmarks[i].presence = 0.0f;
+            }
+        }
+
         hand->handedness = 1;
         hand->score = 0.0f;
         if (h < (int)hand_result.handedness.size() &&

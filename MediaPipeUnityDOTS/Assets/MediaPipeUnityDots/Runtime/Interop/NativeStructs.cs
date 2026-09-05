@@ -32,12 +32,12 @@ namespace MediaPipeUnityDots.Runtime.Interop
         public const int MaxHands = 4;
         public const int LandmarksPerHand = 21;
 
-        // 손당: landmarkCount(int) + handedness(int) + score(float) + 105 floats = 108 floats.
-        // C MpudHandResult와 바이트 일치(handCount int + pad + timestamp long + 4×432).
+        // 손당: landmarkCount(int) + handedness(int) + score(float) + 105 floats + 105 world floats = 213 floats.
+        // C MpudHandResult와 바이트 일치(handCount int + pad + timestamp long + 4×852).
         // 네이티브 헤더의 static assert와 쌍을 이룸. ExpectedSize 불일치는 ABI 드리프트다.
-        public const int ExpectedSize = 1744;
+        public const int ExpectedSize = 3424;
 
-        private const int FloatsPerHand = 108;
+        private const int FloatsPerHand = 213;
 
         public int handCount;
         public long timestampUs;
@@ -76,6 +76,25 @@ namespace MediaPipeUnityDots.Runtime.Interop
             }
 
             var offset = hand * FloatsPerHand + 3 + i * 5;
+            return new MpudNormalizedLandmark
+            {
+                x = handData[offset],
+                y = handData[offset + 1],
+                z = handData[offset + 2],
+                visibility = handData[offset + 3],
+                presence = handData[offset + 4],
+            };
+        }
+
+        public MpudNormalizedLandmark GetHandWorldLandmark(int hand, int i)
+        {
+            CheckHand(hand);
+            if (i < 0 || i >= GetHandLandmarkCount(hand))
+            {
+                throw new ArgumentOutOfRangeException(nameof(i));
+            }
+
+            var offset = hand * FloatsPerHand + 3 + LandmarksPerHand * 5 + i * 5;
             return new MpudNormalizedLandmark
             {
                 x = handData[offset],
@@ -185,12 +204,12 @@ namespace MediaPipeUnityDots.Runtime.Interop
         public const int MaxPoses = 2;
         public const int LandmarksPerPose = 33;
 
-        // 포즈당: landmarkCount(int) + 165 floats = 166 floats.
-        // C MpudPoseResult와 바이트 일치(poseCount int + pad + timestamp long + 2×664).
+        // 포즈당: landmarkCount(int) + 165 floats + 165 world floats = 331 floats.
+        // C MpudPoseResult와 바이트 일치(poseCount int + pad + timestamp long + 2×1324).
         // 네이티브 헤더의 static assert와 쌍을 이룸. ExpectedSize 불일치는 ABI 드리프트다.
-        public const int ExpectedSize = 1344;
+        public const int ExpectedSize = 2664;
 
-        private const int FloatsPerPose = 166;
+        private const int FloatsPerPose = 331;
 
         public int poseCount;
         public long timestampUs;
@@ -214,6 +233,25 @@ namespace MediaPipeUnityDots.Runtime.Interop
             }
 
             var offset = pose * FloatsPerPose + 1 + i * 5;
+            return new MpudNormalizedLandmark
+            {
+                x = poseData[offset],
+                y = poseData[offset + 1],
+                z = poseData[offset + 2],
+                visibility = poseData[offset + 3],
+                presence = poseData[offset + 4],
+            };
+        }
+
+        public MpudNormalizedLandmark GetPoseWorldLandmark(int pose, int i)
+        {
+            CheckPose(pose);
+            if (i < 0 || i >= GetPoseLandmarkCount(pose))
+            {
+                throw new ArgumentOutOfRangeException(nameof(i));
+            }
+
+            var offset = pose * FloatsPerPose + 1 + LandmarksPerPose * 5 + i * 5;
             return new MpudNormalizedLandmark
             {
                 x = poseData[offset],
@@ -248,13 +286,15 @@ namespace MediaPipeUnityDots.Runtime.Interop
         public const int PoseLandmarks = 33;
         public const int HandLandmarks = 21;
 
-        // 부위별: count(int) 4개 + timestamp(long) + 2765 floats.
-        // C MpudHolisticResult와 바이트 일치. 8바이트 정렬 끝 패딩 4바이트 포함 11088.
-        public const int ExpectedSize = 11088;
+        // 부위별: count(int) 4개 + timestamp(long) + 2765 floats + 375 world floats = 12584.
+        // C MpudHolisticResult와 바이트 일치 (8바이트 정렬, 끝 패딩 없음).
+        public const int ExpectedSize = 12584;
 
         private const int FaceFloats = FaceLandmarks * 5;
         private const int PoseFloats = PoseLandmarks * 5;
         private const int HandFloats = HandLandmarks * 5;
+        private const int PoseWorldFloats = PoseLandmarks * 5;
+        private const int HandWorldFloats = HandLandmarks * 5;
 
         public int faceLandmarkCount;
         public int poseLandmarkCount;
@@ -281,6 +321,25 @@ namespace MediaPipeUnityDots.Runtime.Interop
         public MpudNormalizedLandmark GetRightHandLandmark(int i)
         {
             return GetLandmark(FaceFloats + PoseFloats + HandFloats, HandLandmarks, rightHandLandmarkCount, i);
+        }
+
+        public MpudNormalizedLandmark GetPoseWorldLandmark(int i)
+        {
+            return GetLandmark(FaceFloats + PoseFloats + HandFloats * 2, PoseLandmarks, poseLandmarkCount, i);
+        }
+
+        public MpudNormalizedLandmark GetLeftHandWorldLandmark(int i)
+        {
+            return GetLandmark(
+                FaceFloats + PoseFloats + HandFloats * 2 + PoseWorldFloats,
+                HandLandmarks, leftHandLandmarkCount, i);
+        }
+
+        public MpudNormalizedLandmark GetRightHandWorldLandmark(int i)
+        {
+            return GetLandmark(
+                FaceFloats + PoseFloats + HandFloats * 2 + PoseWorldFloats + HandWorldFloats,
+                HandLandmarks, rightHandLandmarkCount, i);
         }
 
         private MpudNormalizedLandmark GetLandmark(int baseOffset, int capacity, int count, int i)

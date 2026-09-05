@@ -14,11 +14,13 @@ namespace MediaPipeUnityDots.Runtime.Tracking
         private const int LandmarkCapacity = MpudPoseResult.LandmarksPerPose;
 
         private readonly MpudNormalizedLandmark[] _landmarks;
+        private readonly MpudNormalizedLandmark[] _worldLandmarks;
         private readonly int[] _landmarkCounts;
 
         public PoseTrackingSnapshot()
         {
             _landmarks = new MpudNormalizedLandmark[MaxPoses * LandmarkCapacity];
+            _worldLandmarks = new MpudNormalizedLandmark[MaxPoses * LandmarkCapacity];
             _landmarkCounts = new int[MaxPoses];
             ResetToEmpty();
         }
@@ -58,6 +60,7 @@ namespace MediaPipeUnityDots.Runtime.Tracking
             PoseCount = poseCount;
             TimestampUs = nativeResult.timestampUs;
             Array.Clear(_landmarks, 0, _landmarks.Length);
+            Array.Clear(_worldLandmarks, 0, _worldLandmarks.Length);
 
             for (var p = 0; p < MaxPoses; p++)
             {
@@ -82,6 +85,10 @@ namespace MediaPipeUnityDots.Runtime.Tracking
                 for (var i = 0; i < landmarkCount; i++)
                 {
                     _landmarks[p * LandmarkCapacity + i] = nativeResult.GetPoseLandmark(p, i);
+                }
+                for (var i = 0; i < landmarkCount; i++)
+                {
+                    _worldLandmarks[p * LandmarkCapacity + i] = nativeResult.GetPoseWorldLandmark(p, i);
                 }
             }
         }
@@ -123,12 +130,49 @@ namespace MediaPipeUnityDots.Runtime.Tracking
         }
 
         /// <summary>
+        /// 지정 포즈의 월드 landmark(미터)를 caller-owned destination에 복사한다.
+        /// destination은 최소 33 capacity여야 한다.
+        /// 반환값은 복사된 landmark 수.
+        /// </summary>
+        public int CopyPoseWorldLandmarksTo(int pose, MpudNormalizedLandmark[] destination)
+        {
+            if (destination == null)
+            {
+                throw new ArgumentNullException(nameof(destination));
+            }
+
+            if (destination.Length < LandmarkCapacity)
+            {
+                throw new ArgumentException("destination length must be at least 33.", nameof(destination));
+            }
+
+            if (pose < 0 || pose >= MaxPoses)
+            {
+                throw new ArgumentOutOfRangeException(nameof(pose));
+            }
+
+            var landmarkCount = GetLandmarkCount(pose);
+            if (landmarkCount > 0)
+            {
+                Array.Copy(_worldLandmarks, pose * LandmarkCapacity, destination, 0, landmarkCount);
+            }
+
+            if (landmarkCount < LandmarkCapacity)
+            {
+                Array.Clear(destination, landmarkCount, LandmarkCapacity - landmarkCount);
+            }
+
+            return landmarkCount;
+        }
+
+        /// <summary>
         /// reset/recreate 직후 empty state로 초기화한다.
         /// TimestampUs=0, PoseCount=0, IsValid=false, FrameCount=0
         /// </summary>
         public void ResetToEmpty()
         {
             Array.Clear(_landmarks, 0, _landmarks.Length);
+            Array.Clear(_worldLandmarks, 0, _worldLandmarks.Length);
 
             PoseCount = 0;
             TimestampUs = 0;

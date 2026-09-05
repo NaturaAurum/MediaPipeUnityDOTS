@@ -24,10 +24,14 @@ typedef struct MpudHolisticResult {
     MpudNormalizedLandmark pose_landmarks[MPUD_HOLISTIC_POSE_LANDMARKS];
     MpudNormalizedLandmark left_hand_landmarks[MPUD_HOLISTIC_HAND_LANDMARKS];
     MpudNormalizedLandmark right_hand_landmarks[MPUD_HOLISTIC_HAND_LANDMARKS];
+    // 월드 좌표(미터). pose/양손만 존재. 정규화와 같은 인덱스, 카운트 공유.
+    MpudNormalizedLandmark pose_world_landmarks[MPUD_HOLISTIC_POSE_LANDMARKS];
+    MpudNormalizedLandmark left_hand_world_landmarks[MPUD_HOLISTIC_HAND_LANDMARKS];
+    MpudNormalizedLandmark right_hand_world_landmarks[MPUD_HOLISTIC_HAND_LANDMARKS];
 } MpudHolisticResult;
 
 // ABI 고정: C# MpudHolisticResult와 바이트 일치해야 함. 깨지면 양쪽 static assert가 잡는다.
-_Static_assert(sizeof(MpudHolisticResult) == 11088, "MpudHolisticResult layout changed");
+_Static_assert(sizeof(MpudHolisticResult) == 12584, "MpudHolisticResult layout changed");
 
 // --- Config ---
 typedef struct MpudHolisticTrackerConfig {

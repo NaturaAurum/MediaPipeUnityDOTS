@@ -15,6 +15,7 @@ namespace MediaPipeUnityDots.Runtime.Tracking
         private const int LandmarkCapacity = MpudHandResult.LandmarksPerHand;
 
         private readonly MpudNormalizedLandmark[] _landmarks;
+        private readonly MpudNormalizedLandmark[] _worldLandmarks;
         private readonly int[] _handedness;
         private readonly float[] _scores;
         private readonly int[] _landmarkCounts;
@@ -22,6 +23,7 @@ namespace MediaPipeUnityDots.Runtime.Tracking
         public HandTrackingSnapshot()
         {
             _landmarks = new MpudNormalizedLandmark[MaxHands * LandmarkCapacity];
+            _worldLandmarks = new MpudNormalizedLandmark[MaxHands * LandmarkCapacity];
             _handedness = new int[MaxHands];
             _scores = new float[MaxHands];
             _landmarkCounts = new int[MaxHands];
@@ -71,6 +73,7 @@ namespace MediaPipeUnityDots.Runtime.Tracking
             HandCount = handCount;
             TimestampUs = nativeResult.timestampUs;
             Array.Clear(_landmarks, 0, _landmarks.Length);
+            Array.Clear(_worldLandmarks, 0, _worldLandmarks.Length);
 
             for (var h = 0; h < MaxHands; h++)
             {
@@ -99,6 +102,10 @@ namespace MediaPipeUnityDots.Runtime.Tracking
                 for (var i = 0; i < landmarkCount; i++)
                 {
                     _landmarks[h * LandmarkCapacity + i] = nativeResult.GetHandLandmark(h, i);
+                }
+                for (var i = 0; i < landmarkCount; i++)
+                {
+                    _worldLandmarks[h * LandmarkCapacity + i] = nativeResult.GetHandWorldLandmark(h, i);
                 }
             }
         }
@@ -150,12 +157,49 @@ namespace MediaPipeUnityDots.Runtime.Tracking
         }
 
         /// <summary>
+        /// 지정 손의 월드 landmark(미터)를 caller-owned destination에 복사한다.
+        /// destination은 최소 21 capacity여야 한다.
+        /// 반환값은 복사된 landmark 수.
+        /// </summary>
+        public int CopyHandWorldLandmarksTo(int hand, MpudNormalizedLandmark[] destination)
+        {
+            if (destination == null)
+            {
+                throw new ArgumentNullException(nameof(destination));
+            }
+
+            if (destination.Length < LandmarkCapacity)
+            {
+                throw new ArgumentException("destination length must be at least 21.", nameof(destination));
+            }
+
+            if (hand < 0 || hand >= MaxHands)
+            {
+                throw new ArgumentOutOfRangeException(nameof(hand));
+            }
+
+            var landmarkCount = GetLandmarkCount(hand);
+            if (landmarkCount > 0)
+            {
+                Array.Copy(_worldLandmarks, hand * LandmarkCapacity, destination, 0, landmarkCount);
+            }
+
+            if (landmarkCount < LandmarkCapacity)
+            {
+                Array.Clear(destination, landmarkCount, LandmarkCapacity - landmarkCount);
+            }
+
+            return landmarkCount;
+        }
+
+        /// <summary>
         /// reset/recreate 직후 empty state로 초기화한다.
         /// TimestampUs=0, HandCount=0, IsValid=false, FrameCount=0
         /// </summary>
         public void ResetToEmpty()
         {
             Array.Clear(_landmarks, 0, _landmarks.Length);
+            Array.Clear(_worldLandmarks, 0, _worldLandmarks.Length);
 
             HandCount = 0;
             TimestampUs = 0;

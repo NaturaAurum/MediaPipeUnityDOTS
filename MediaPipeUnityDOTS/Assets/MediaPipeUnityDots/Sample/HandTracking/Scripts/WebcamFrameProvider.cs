@@ -327,6 +327,37 @@ namespace MediaPipeUnityDots.Sample.HandTracking.Scripts
                     }
                 }
             }
+
+            var world = entityManager.GetBuffer<WorldLandmarkElement>(_singletonEntity);
+            if (world.Length != handCount * LandmarkCapacity)
+            {
+                world.ResizeUninitialized(handCount * LandmarkCapacity);
+            }
+
+            for (var h = 0; h < handCount; h++)
+            {
+                var worldCount = _service.CopyLatestHandWorldLandmarksTo(h, _landmarkCopyBuffer);
+                for (var i = 0; i < LandmarkCapacity; i++)
+                {
+                    var bufferIndex = h * LandmarkCapacity + i;
+                    if (i < worldCount)
+                    {
+                        var source = _landmarkCopyBuffer[i];
+                        world[bufferIndex] = new WorldLandmarkElement
+                        {
+                            X = source.x,
+                            Y = source.y,
+                            Z = source.z,
+                            Visibility = source.visibility,
+                            HandIndex = h,
+                        };
+                    }
+                    else
+                    {
+                        world[bufferIndex] = new WorldLandmarkElement { HandIndex = -1 };
+                    }
+                }
+            }
         }
 
         private bool TryGetEntityManager(out EntityManager entityManager)

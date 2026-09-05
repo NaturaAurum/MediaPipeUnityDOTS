@@ -247,6 +247,34 @@ namespace MediaPipeUnityDots.Sample.HandTracking.Scripts
                     };
                 }
 
+                var world = entityManager.GetBuffer<PoseWorldLandmarkElement>(_poseSingleton);
+                if (world.Length != count)
+                {
+                    world.ResizeUninitialized(count);
+                }
+
+                var worldCount = _service.CopyLatestPoseWorldTo(_poseCopyBuffer);
+                for (var i = 0; i < count; i++)
+                {
+                    if (i < worldCount)
+                    {
+                        var worldSource = _poseCopyBuffer[i];
+                        world[i] = new PoseWorldLandmarkElement
+                        {
+                            X = worldSource.x,
+                            Y = worldSource.y,
+                            Z = worldSource.z,
+                            Visibility = worldSource.visibility,
+                            PoseIndex = 0,
+                        };
+                    }
+                    else
+                    {
+                        world[i] = new PoseWorldLandmarkElement { PoseIndex = -1 };
+                    }
+                }
+
+
                 return;
             }
 
@@ -304,6 +332,68 @@ namespace MediaPipeUnityDots.Sample.HandTracking.Scripts
                 status.ScoreList.Add(1f);
                 slot++;
             }
+
+            var world = entityManager.GetBuffer<WorldLandmarkElement>(_handSingleton);
+            if (world.Length != handCount * 21)
+            {
+                world.ResizeUninitialized(handCount * 21);
+            }
+
+            var worldSlot = 0;
+            if (leftCount > 0)
+            {
+                var leftWorldCount = _service.CopyLatestLeftHandWorldTo(_handCopyBuffer);
+                for (var i = 0; i < 21; i++)
+                {
+                    var bufferIndex = worldSlot * 21 + i;
+                    if (i < leftWorldCount)
+                    {
+                        var worldSource = _handCopyBuffer[i];
+                        world[bufferIndex] = new WorldLandmarkElement
+                        {
+                            X = worldSource.x,
+                            Y = worldSource.y,
+                            Z = worldSource.z,
+                            Visibility = worldSource.visibility,
+                            HandIndex = 0,
+                        };
+                    }
+                    else
+                    {
+                        world[bufferIndex] = new WorldLandmarkElement { HandIndex = -1 };
+                    }
+                }
+
+                worldSlot++;
+            }
+
+            if (rightCount > 0)
+            {
+                var rightWorldCount = _service.CopyLatestRightHandWorldTo(_handCopyBuffer);
+                for (var i = 0; i < 21; i++)
+                {
+                    var bufferIndex = worldSlot * 21 + i;
+                    if (i < rightWorldCount)
+                    {
+                        var worldSource = _handCopyBuffer[i];
+                        world[bufferIndex] = new WorldLandmarkElement
+                        {
+                            X = worldSource.x,
+                            Y = worldSource.y,
+                            Z = worldSource.z,
+                            Visibility = worldSource.visibility,
+                            HandIndex = worldSlot,
+                        };
+                    }
+                    else
+                    {
+                        world[bufferIndex] = new WorldLandmarkElement { HandIndex = -1 };
+                    }
+                }
+
+                worldSlot++;
+            }
+
 
 
             entityManager.SetComponentData(_handSingleton, status);

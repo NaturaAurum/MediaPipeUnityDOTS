@@ -166,6 +166,24 @@ namespace MediaPipeUnityDots.Runtime.Tracking
             return _snapshot.CopyRightHandTo(destination);
         }
 
+        public int CopyLatestPoseWorldTo(MpudNormalizedLandmark[] destination)
+        {
+            ThrowIfDisposed();
+            return _snapshot.CopyPoseWorldTo(destination);
+        }
+
+        public int CopyLatestLeftHandWorldTo(MpudNormalizedLandmark[] destination)
+        {
+            ThrowIfDisposed();
+            return _snapshot.CopyLeftHandWorldTo(destination);
+        }
+
+        public int CopyLatestRightHandWorldTo(MpudNormalizedLandmark[] destination)
+        {
+            ThrowIfDisposed();
+            return _snapshot.CopyRightHandWorldTo(destination);
+        }
+
         /// <summary>
         /// tracker를 destroy + recreate한다.
         /// snapshot, timestampGen, flipBuffer를 모두 초기화한다.
