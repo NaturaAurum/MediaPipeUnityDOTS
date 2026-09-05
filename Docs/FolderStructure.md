@@ -109,3 +109,16 @@ MediaPipeUnityDOTS/
 - 현재 `Assets/TutorialInfo` 는 Unity 템플릿 기본 자산으로 보이며, 추후 정리 대상입니다.
 - `Assets/Scenes` 와 `Assets/Settings` 는 이미 존재하므로 그대로 유지하면서 `MediaPipeUnityDots`, `Plugins` 를 추가하는 쪽이 자연스럽습니다.
 - 패키지화는 브리지 계층 경계가 충분히 안정된 뒤 진행하는 것이 좋습니다.
+
+## Runtime 승격 후보 (Sample → Runtime)
+
+`Sample/HandTracking/Scripts` 중 플러그인 코어 체질이라 패키징 시점에
+`Runtime`으로 옮길 파일. 지금은 단일 레포·단방향 참조라 이동하지 않는다.
+
+- 승격: `Webcam/Face/Pose/HolisticFrameProvider`, `HandTrackingAdapter`,
+  `HandTrackingDto` (네이티브→ECS 진입점, 의존성 없음).
+- 조건부 승격: `Face/Hand/PoseLandmarkPointSpawner` — Entities Graphics
+  의존을 `Runtime` asmdef로 끌고 들어가므로 렌더링 의존 정리 후.
+- 잔류: `OneEuroFilterSettingsPanel`, `HandTrackingStatusPanel`
+  (App 레이어 UI), `WebcamBackgroundRenderer`, `WebcamBackgroundToggle`
+  (데모 씬 전용), `NativeSmokeTest`(+Editor 러너, 진단용).
