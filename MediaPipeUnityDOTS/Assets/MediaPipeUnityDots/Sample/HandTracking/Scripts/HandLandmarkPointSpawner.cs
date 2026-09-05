@@ -59,6 +59,7 @@ namespace MediaPipeUnityDots.Sample.HandTracking.Scripts
                 {
                     var entity = entityManager.CreateEntity();
                     entityManager.AddComponentData(entity, new HandLandmarkPoint { HandIndex = h, Index = i });
+                    entityManager.AddComponentData(entity, new LandmarkFilterState());
                     entityManager.AddComponentData(
                         entity,
                         LocalTransform.FromPositionRotationScale(float3.zero, quaternion.identity, 0f));
