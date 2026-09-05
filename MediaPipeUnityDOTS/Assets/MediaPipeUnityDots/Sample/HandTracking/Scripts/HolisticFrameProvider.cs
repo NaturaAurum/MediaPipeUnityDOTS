@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using MediaPipeUnityDots.Runtime.Ecs;
+using MediaPipeUnityDots.Runtime.Logging;
 using MediaPipeUnityDots.Runtime.Interop;
 using MediaPipeUnityDots.Runtime.Tracking;
 using Unity.Entities;
@@ -24,8 +25,6 @@ namespace MediaPipeUnityDots.Sample.HandTracking.Scripts
         private float _minPresenceConfidence = 0.5f;
         [SerializeField]
         private int _logIntervalFrames = 60;
-        [SerializeField]
-        private bool _verboseLogging;
 
         private HolisticTrackingService _service;
         private MpudNormalizedLandmark[] _faceCopyBuffer;
@@ -89,7 +88,7 @@ namespace MediaPipeUnityDots.Sample.HandTracking.Scripts
             }
 
             _submitCount++;
-            if (_verboseLogging && _logIntervalFrames > 0 && _submitCount % _logIntervalFrames == 0)
+            if (MpudLogService.Enabled && _logIntervalFrames > 0 && _submitCount % _logIntervalFrames == 0)
             {
                 Debug.Log(
                     $"[MPUD] Holistic frame #{_service.LatestFrameCount} | Valid={_service.LatestIsValid} | Face={_service.LatestFaceLandmarkCount} Pose={_service.LatestPoseLandmarkCount} L={_service.LatestLeftHandLandmarkCount} R={_service.LatestRightHandLandmarkCount} | ts={_service.LatestTimestampUs}");

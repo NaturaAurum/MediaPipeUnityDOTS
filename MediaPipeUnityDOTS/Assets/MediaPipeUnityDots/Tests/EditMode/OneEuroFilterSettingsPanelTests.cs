@@ -1,4 +1,5 @@
 using MediaPipeUnityDots.Sample.HandTracking.Scripts;
+using MediaPipeUnityDots.Runtime.Logging;
 using NUnit.Framework;
 using UnityEngine;
 using UnityEngine.UIElements;
@@ -20,6 +21,7 @@ namespace MediaPipeUnityDots.Tests.EditMode
         private Slider _handMinCutoff;
         private Slider _handBeta;
         private Button _resetButton;
+        private Toggle _verboseLoggingToggle;
 
         [SetUp]
         public void SetUp()
@@ -34,11 +36,13 @@ namespace MediaPipeUnityDots.Tests.EditMode
             _handMinCutoff = new Slider { name = "hand-min-cutoff", lowValue = 0.1f, highValue = 5f, value = 1f };
             _handBeta = new Slider { name = "hand-beta", lowValue = 0.001f, highValue = 0.05f, value = 0.007f };
             _resetButton = new Button { name = "reset-defaults-button" };
+            _verboseLoggingToggle = new Toggle { name = "verbose-logging-toggle" };
 
             _panelElement.Add(_toggle);
             _panelElement.Add(_handMinCutoff);
             _panelElement.Add(_handBeta);
             _panelElement.Add(_resetButton);
+            _panelElement.Add(_verboseLoggingToggle);
             _root.Add(_panelElement);
         }
 
@@ -113,6 +117,16 @@ namespace MediaPipeUnityDots.Tests.EditMode
 
             Assert.AreEqual(pushesBeforeReset + 1, _panel.PushCount);
             Assert.AreEqual(1.0f, _handMinCutoff.value, 1e-5f);
+        }
+
+        [Test]
+        public void VerboseLoggingToggle_FlipsLogServiceFlag()
+        {
+            _panel.BindToRoot(_root);
+            _verboseLoggingToggle.value = true;
+            Assert.IsTrue(MpudLogService.Enabled);
+            _verboseLoggingToggle.value = false;
+            Assert.IsFalse(MpudLogService.Enabled);
         }
     }
 }
