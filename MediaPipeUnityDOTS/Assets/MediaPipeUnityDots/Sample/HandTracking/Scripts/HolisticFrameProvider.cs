@@ -47,7 +47,7 @@ namespace MediaPipeUnityDots.Sample.HandTracking.Scripts
 
             if (_webcamSource == null)
             {
-                Debug.LogError("[MPUD] HolisticFrameProvider needs WebcamFrameProvider.");
+                MpudLog.Error("[MPUD] HolisticFrameProvider needs WebcamFrameProvider.");
                 enabled = false;
                 return;
             }
@@ -58,7 +58,7 @@ namespace MediaPipeUnityDots.Sample.HandTracking.Scripts
             }
             catch (Exception exception)
             {
-                Debug.LogError($"[MPUD] Failed to initialize holistic provider: {exception}");
+                MpudLog.Error($"[MPUD] Failed to initialize holistic provider: {exception}");
                 DisposeResources();
                 enabled = false;
             }
@@ -88,9 +88,9 @@ namespace MediaPipeUnityDots.Sample.HandTracking.Scripts
             }
 
             _submitCount++;
-            if (MpudLogService.Enabled && _logIntervalFrames > 0 && _submitCount % _logIntervalFrames == 0)
+            if (MpudLog.Enabled && _logIntervalFrames > 0 && _submitCount % _logIntervalFrames == 0)
             {
-                Debug.Log(
+                MpudLog.Log(
                     $"[MPUD] Holistic frame #{_service.LatestFrameCount} | Valid={_service.LatestIsValid} | Face={_service.LatestFaceLandmarkCount} Pose={_service.LatestPoseLandmarkCount} L={_service.LatestLeftHandLandmarkCount} R={_service.LatestRightHandLandmarkCount} | ts={_service.LatestTimestampUs}");
             }
 
@@ -147,7 +147,7 @@ namespace MediaPipeUnityDots.Sample.HandTracking.Scripts
 
             TryGetEntityManager(out _);
 
-            Debug.Log("[MPUD] Holistic provider started.");
+            MpudLog.Log("[MPUD] Holistic provider started.");
         }
 
         private void DisposeResources()

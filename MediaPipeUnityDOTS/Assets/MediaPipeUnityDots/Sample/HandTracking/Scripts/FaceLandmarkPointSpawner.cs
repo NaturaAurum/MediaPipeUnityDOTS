@@ -28,7 +28,7 @@ namespace MediaPipeUnityDots.Sample.HandTracking.Scripts
         {
             if (_provider == null)
             {
-                Debug.LogError("[MPUD] FaceLandmarkPointSpawner needs FaceFrameProvider.");
+                MpudLog.Error("[MPUD] FaceLandmarkPointSpawner needs FaceFrameProvider.");
                 enabled = false;
                 return;
             }

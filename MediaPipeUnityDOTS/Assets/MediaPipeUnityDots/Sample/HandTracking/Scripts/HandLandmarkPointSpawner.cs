@@ -28,7 +28,7 @@ namespace MediaPipeUnityDots.Sample.HandTracking.Scripts
         {
             if (_provider == null)
             {
-                Debug.LogError("[MPUD] HandLandmarkPointSpawner needs WebcamFrameProvider.");
+                MpudLog.Error("[MPUD] HandLandmarkPointSpawner needs WebcamFrameProvider.");
                 enabled = false;
                 return;
             }

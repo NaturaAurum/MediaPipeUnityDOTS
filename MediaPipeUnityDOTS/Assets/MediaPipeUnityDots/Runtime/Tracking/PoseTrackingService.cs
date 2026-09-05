@@ -75,7 +75,7 @@ namespace MediaPipeUnityDots.Runtime.Tracking
 
             if (!IsCreated)
             {
-                Debug.LogError("[MPUD] pose submit skipped because tracker is not created.");
+                MpudLog.Error("[MPUD] pose submit skipped because tracker is not created.");
                 return;
             }
 
@@ -121,7 +121,7 @@ namespace MediaPipeUnityDots.Runtime.Tracking
                 var submitStatus = MpudPoseBridge.mpud_submit_pose_frame(_trackerHandle, ref frame);
                 if (submitStatus != MpudStatus.Ok)
                 {
-                    Debug.LogError($"[MPUD] submit_pose_frame failed ({submitStatus}): {MpudPoseBridge.GetLastPoseError()}");
+                    MpudLog.Error($"[MPUD] submit_pose_frame failed ({submitStatus}): {MpudPoseBridge.GetLastPoseError()}");
                     return;
                 }
             }
@@ -142,11 +142,11 @@ namespace MediaPipeUnityDots.Runtime.Tracking
 
             if (pollStatus == MpudStatus.NoResult)
             {
-                Debug.LogWarning("[MPUD] try_get_latest_pose_result returned MPUD_NO_RESULT immediately after a successful submit.");
+                MpudLog.Warning("[MPUD] try_get_latest_pose_result returned MPUD_NO_RESULT immediately after a successful submit.");
                 return;
             }
 
-            Debug.LogError($"[MPUD] try_get_latest_pose_result failed ({pollStatus}): {MpudPoseBridge.GetLastPoseError()}");
+            MpudLog.Error($"[MPUD] try_get_latest_pose_result failed ({pollStatus}): {MpudPoseBridge.GetLastPoseError()}");
         }
 
         /// <summary>

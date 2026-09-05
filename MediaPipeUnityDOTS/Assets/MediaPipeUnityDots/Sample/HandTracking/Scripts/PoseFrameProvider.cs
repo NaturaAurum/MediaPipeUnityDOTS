@@ -49,7 +49,7 @@ namespace MediaPipeUnityDots.Sample.HandTracking.Scripts
 
             if (_webcamSource == null)
             {
-                Debug.LogError("[MPUD] PoseFrameProvider needs WebcamFrameProvider.");
+                MpudLog.Error("[MPUD] PoseFrameProvider needs WebcamFrameProvider.");
                 enabled = false;
                 return;
             }
@@ -60,7 +60,7 @@ namespace MediaPipeUnityDots.Sample.HandTracking.Scripts
             }
             catch (Exception exception)
             {
-                Debug.LogError($"[MPUD] Failed to initialize pose provider: {exception}");
+                MpudLog.Error($"[MPUD] Failed to initialize pose provider: {exception}");
                 DisposeResources();
                 enabled = false;
             }
@@ -90,9 +90,9 @@ namespace MediaPipeUnityDots.Sample.HandTracking.Scripts
             }
 
             _submitCount++;
-            if (MpudLogService.Enabled && _logIntervalFrames > 0 && _submitCount % _logIntervalFrames == 0)
+            if (MpudLog.Enabled && _logIntervalFrames > 0 && _submitCount % _logIntervalFrames == 0)
             {
-                Debug.Log(
+                MpudLog.Log(
                     $"[MPUD] Pose frame #{_service.LatestFrameCount} | Valid={_service.LatestIsValid} | Poses={_service.LatestPoseCount} | Landmarks={_service.LatestLandmarkCount} | ts={_service.LatestTimestampUs}");
             }
 
@@ -144,7 +144,7 @@ namespace MediaPipeUnityDots.Sample.HandTracking.Scripts
 
             TryGetEntityManager(out _);
 
-            Debug.Log("[MPUD] Pose provider started.");
+            MpudLog.Log("[MPUD] Pose provider started.");
         }
 
         private void DisposeResources()

@@ -68,7 +68,7 @@ namespace MediaPipeUnityDots.Runtime.Tracking
 
             if (!IsCreated)
             {
-                Debug.LogError("[MPUD] holistic submit skipped because tracker is not created.");
+                MpudLog.Error("[MPUD] holistic submit skipped because tracker is not created.");
                 return;
             }
 
@@ -114,7 +114,7 @@ namespace MediaPipeUnityDots.Runtime.Tracking
                 var submitStatus = MpudHolisticBridge.mpud_submit_holistic_frame(_trackerHandle, ref frame);
                 if (submitStatus != MpudStatus.Ok)
                 {
-                    Debug.LogError($"[MPUD] submit_holistic_frame failed ({submitStatus}): {MpudHolisticBridge.GetLastHolisticError()}");
+                    MpudLog.Error($"[MPUD] submit_holistic_frame failed ({submitStatus}): {MpudHolisticBridge.GetLastHolisticError()}");
                     return;
                 }
             }
@@ -135,11 +135,11 @@ namespace MediaPipeUnityDots.Runtime.Tracking
 
             if (pollStatus == MpudStatus.NoResult)
             {
-                Debug.LogWarning("[MPUD] try_get_latest_holistic_result returned MPUD_NO_RESULT immediately after a successful submit.");
+                MpudLog.Warning("[MPUD] try_get_latest_holistic_result returned MPUD_NO_RESULT immediately after a successful submit.");
                 return;
             }
 
-            Debug.LogError($"[MPUD] try_get_latest_holistic_result failed ({pollStatus}): {MpudHolisticBridge.GetLastHolisticError()}");
+            MpudLog.Error($"[MPUD] try_get_latest_holistic_result failed ({pollStatus}): {MpudHolisticBridge.GetLastHolisticError()}");
         }
 
         public int CopyLatestFaceTo(MpudNormalizedLandmark[] destination)

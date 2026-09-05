@@ -28,7 +28,7 @@ namespace MediaPipeUnityDots.Sample.HandTracking.Scripts
         {
             if (_provider == null)
             {
-                Debug.LogError("[MPUD] PoseLandmarkPointSpawner needs PoseFrameProvider.");
+                MpudLog.Error("[MPUD] PoseLandmarkPointSpawner needs PoseFrameProvider.");
                 enabled = false;
                 return;
             }

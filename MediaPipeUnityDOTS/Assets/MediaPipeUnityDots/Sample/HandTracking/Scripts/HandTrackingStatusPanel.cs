@@ -30,7 +30,7 @@ namespace MediaPipeUnityDots.Sample.HandTracking.Scripts
         {
             if (_adapter == null || _provider == null || _panelRenderer == null)
             {
-                Debug.LogError("[MPUD] HandTrackingStatusPanel references are not wired in the scene.");
+                MpudLog.Error("[MPUD] HandTrackingStatusPanel references are not wired in the scene.");
                 enabled = false;
                 return;
             }
@@ -70,7 +70,7 @@ namespace MediaPipeUnityDots.Sample.HandTracking.Scripts
             if (_stateLabel == null || _frameLabel == null || _timestampLabel == null
                 || _handednessLabel == null || _confidenceLabel == null || resetButton == null)
             {
-                Debug.LogError("[MPUD] StatusPanel.uxml is missing expected elements.");
+                MpudLog.Error("[MPUD] StatusPanel.uxml is missing expected elements.");
             }
         }
 
