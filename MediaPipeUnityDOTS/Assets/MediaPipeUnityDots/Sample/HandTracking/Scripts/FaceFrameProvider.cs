@@ -1,0 +1,255 @@
+using System;
+using System.IO;
+using MediaPipeUnityDots.Runtime.Ecs;
+using MediaPipeUnityDots.Runtime.Interop;
+using MediaPipeUnityDots.Runtime.Tracking;
+using Unity.Entities;
+using UnityEngine;
+
+namespace MediaPipeUnityDots.Sample.HandTracking.Scripts
+{
+    /// <summary>
+    /// 공유 웹캠 픽셀을 얼굴 트래커에 제출하고 결과를 ECS에 푸시하는 샘플 프로바이더.
+    /// WebcamFrameProvider.Update 이후에 동작하므로 LateUpdate에서 소비한다.
+    /// </summary>
+    public sealed class FaceFrameProvider : MonoBehaviour
+    {
+        private const int LandmarkCapacity = 478;
+
+        [SerializeField]
+        private WebcamFrameProvider _webcamSource;
+        [SerializeField]
+        private int _logIntervalFrames = 60;
+        [SerializeField]
+        private int _numFaces = 1;
+        [SerializeField]
+        private float _minDetectionConfidence = 0.5f;
+        [SerializeField]
+        private float _minTrackingConfidence = 0.5f;
+
+        /// <summary>
+        /// 추적할 얼굴 수. FaceTrackingService와 포인트 스포너가 공유한다.
+        /// </summary>
+        public int NumFaces => Mathf.Clamp(_numFaces, 1, MpudFaceResult.MaxFaces);
+
+        private FaceTrackingService _service;
+        private MpudNormalizedLandmark[] _landmarkCopyBuffer;
+        private World _ecsWorld;
+        private Entity _singletonEntity;
+        private long _submitCount;
+        private long _lastCopiedTimestamp;
+
+        private void OnEnable()
+        {
+            if (!Application.isPlaying)
+            {
+                return;
+            }
+
+            if (_webcamSource == null)
+            {
+                Debug.LogError("[MPUD] FaceFrameProvider needs WebcamFrameProvider.");
+                enabled = false;
+                return;
+            }
+
+            try
+            {
+                InitializeResources();
+            }
+            catch (Exception exception)
+            {
+                Debug.LogError($"[MPUD] Failed to initialize face provider: {exception}");
+                DisposeResources();
+                enabled = false;
+            }
+        }
+
+        private void LateUpdate()
+        {
+            if (_service == null)
+            {
+                return;
+            }
+
+            var pixels = _webcamSource.LatestPixels;
+            var width = _webcamSource.LatestPixelWidth;
+            var height = _webcamSource.LatestPixelHeight;
+            if (pixels == null || width <= 0 || height <= 0)
+            {
+                return;
+            }
+
+            var previousFrameCount = _service.LatestFrameCount;
+            _service.SubmitAndPoll(pixels, width, height, _webcamSource.LatestFlipVertically);
+
+            if (_service.LatestFrameCount == previousFrameCount)
+            {
+                return;
+            }
+
+            if (_logIntervalFrames > 0 && _submitCount % _logIntervalFrames == 0)
+            {
+                Debug.Log(
+                    $"[MPUD] Face frame #{_service.LatestFrameCount} | Valid={_service.LatestIsValid} | Faces={_service.LatestFaceCount} | Landmarks={_service.LatestLandmarkCount} | ts={_service.LatestTimestampUs}");
+            }
+
+            if (!TryGetEntityManager(out var entityManager))
+            {
+                return;
+            }
+
+            if (_service.LatestTimestampUs <= _lastCopiedTimestamp)
+            {
+                return;
+            }
+
+            PushLatestSnapshotToEcs(entityManager);
+            _lastCopiedTimestamp = _service.LatestTimestampUs;
+        }
+
+        private void OnDisable()
+        {
+            WriteResetStateIfPossible();
+            DisposeResources();
+        }
+
+        private void OnDestroy() => DisposeResources();
+
+        private void InitializeResources()
+        {
+            if (_service != null)
+            {
+                return;
+            }
+
+            var modelPath = Path.Combine(
+                Application.streamingAssetsPath,
+                "MediaPipe",
+                "Models",
+                "face_landmarker.task");
+            if (!File.Exists(modelPath))
+            {
+                throw new FileNotFoundException("face_landmarker.task was not found.", modelPath);
+            }
+            _service = new FaceTrackingService(modelPath, NumFaces, _minDetectionConfidence, _minTrackingConfidence);
+            _landmarkCopyBuffer = new MpudNormalizedLandmark[LandmarkCapacity];
+            _ecsWorld = null;
+            _singletonEntity = Entity.Null;
+            _submitCount = 0;
+            _lastCopiedTimestamp = 0;
+
+            TryGetEntityManager(out _);
+
+            Debug.Log("[MPUD] Face provider started.");
+        }
+
+        private void DisposeResources()
+        {
+            if (_service != null)
+            {
+                _service.Dispose();
+                _service = null;
+            }
+
+            _landmarkCopyBuffer = null;
+            _ecsWorld = null;
+            _singletonEntity = Entity.Null;
+        }
+
+
+        private void PushLatestSnapshotToEcs(EntityManager entityManager)
+        {
+            if (_service.LatestIsValid)
+            {
+                WriteValidPolledState(entityManager);
+                return;
+            }
+
+            FaceTrackingSingletonUtil.WriteInvalidPolledState(
+                entityManager,
+                _singletonEntity,
+                _service.LatestTimestampUs,
+                _service.LatestFrameCount);
+        }
+
+        private void WriteValidPolledState(EntityManager entityManager)
+        {
+            var faceCount = _service.LatestFaceCount;
+
+            entityManager.SetComponentData(
+                _singletonEntity,
+                new FaceTrackingStatus
+                {
+                    IsValid = true,
+                    FaceCount = faceCount,
+                    LandmarkCount = _service.LatestLandmarkCount,
+                    TimestampUs = _service.LatestTimestampUs,
+                    FrameCount = _service.LatestFrameCount,
+                });
+
+            var landmarks = entityManager.GetBuffer<FaceLandmarkElement>(_singletonEntity);
+            landmarks.ResizeUninitialized(faceCount * LandmarkCapacity);
+
+            for (var f = 0; f < faceCount; f++)
+            {
+                var copiedCount = _service.CopyLatestFaceLandmarksTo(f, _landmarkCopyBuffer);
+                for (var i = 0; i < LandmarkCapacity; i++)
+                {
+                    var bufferIndex = f * LandmarkCapacity + i;
+                    if (i < copiedCount)
+                    {
+                        var source = _landmarkCopyBuffer[i];
+                        landmarks[bufferIndex] = new FaceLandmarkElement
+                        {
+                            X = source.x,
+                            Y = source.y,
+                            Z = source.z,
+                            FaceIndex = f,
+                        };
+                    }
+                    else
+                    {
+                        landmarks[bufferIndex] = new FaceLandmarkElement { FaceIndex = -1 };
+                    }
+                }
+            }
+        }
+
+        private bool TryGetEntityManager(out EntityManager entityManager)
+        {
+            entityManager = default;
+
+            var defaultWorld = World.DefaultGameObjectInjectionWorld;
+            if (defaultWorld is not { IsCreated: true })
+            {
+                _ecsWorld = null;
+                _singletonEntity = Entity.Null;
+                return false;
+            }
+
+            if (_ecsWorld == null || _ecsWorld != defaultWorld || !_ecsWorld.IsCreated)
+            {
+                _ecsWorld = defaultWorld;
+                _singletonEntity = Entity.Null;
+            }
+
+            if (_singletonEntity == Entity.Null || !defaultWorld.EntityManager.Exists(_singletonEntity))
+            {
+                _singletonEntity = FaceTrackingSingletonUtil.GetOrCreateSingleton(defaultWorld.EntityManager);
+            }
+
+            entityManager = defaultWorld.EntityManager;
+            return true;
+        }
+
+        private void WriteResetStateIfPossible()
+        {
+            if (_ecsWorld is { IsCreated: true } && _singletonEntity != Entity.Null
+                && _ecsWorld.EntityManager.Exists(_singletonEntity))
+            {
+                FaceTrackingSingletonUtil.WriteResetEmptyState(_ecsWorld.EntityManager, _singletonEntity);
+            }
+        }
+    }
+}

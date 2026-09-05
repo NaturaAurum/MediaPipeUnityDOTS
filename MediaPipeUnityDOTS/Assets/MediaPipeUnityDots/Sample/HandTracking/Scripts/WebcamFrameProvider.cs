@@ -31,6 +31,17 @@ namespace MediaPipeUnityDots.Sample.HandTracking.Scripts
         /// </summary>
         public int NumHands => Mathf.Clamp(_numHands, 1, MpudHandResult.MaxHands);
 
+        /// <summary>
+        /// Update에서 읽은 최신 raw 픽셀. 얼굴 등 다른 트래커와 웹캠을 공유한다.
+        /// </summary>
+        public Color32[] LatestPixels => _pixelBuffer;
+
+        public int LatestPixelWidth { get; private set; }
+
+        public int LatestPixelHeight { get; private set; }
+
+        public bool LatestFlipVertically { get; private set; }
+
         private WebCamTexture _webCamTexture;
         private HandTrackingService _service;
         private Color32[] _pixelBuffer;
@@ -99,6 +110,9 @@ namespace MediaPipeUnityDots.Sample.HandTracking.Scripts
             _webCamTexture.GetPixels32(_pixelBuffer);
 
             var flipVertically = _webCamTexture.videoVerticallyMirrored;
+            LatestPixelWidth = width;
+            LatestPixelHeight = height;
+            LatestFlipVertically = flipVertically;
             if (!_hasLoggedRuntimeMetadata)
             {
                 Debug.Log(
@@ -169,7 +183,6 @@ namespace MediaPipeUnityDots.Sample.HandTracking.Scripts
             {
                 throw new FileNotFoundException("hand_landmarker.task was not found.", modelPath);
             }
-
             var devices = WebCamTexture.devices;
             if (devices == null || devices.Length == 0)
             {
