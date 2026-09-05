@@ -32,7 +32,7 @@ namespace MediaPipeUnityDots.Sample.HandTracking.Scripts
         private Slider _poseBeta;
         private Button _resetButton;
 
-        internal int PushCount { get; private set; }
+        public int PushCount { get; private set; }
 
         private void OnEnable()
         {
@@ -63,7 +63,7 @@ namespace MediaPipeUnityDots.Sample.HandTracking.Scripts
             BindToRoot(root);
         }
 
-        internal void BindToRoot(VisualElement root)
+        public void BindToRoot(VisualElement root)
         {
             UnbindEvents();
 
@@ -136,7 +136,7 @@ namespace MediaPipeUnityDots.Sample.HandTracking.Scripts
             }
         }
 
-        internal void UnbindEvents()
+        public void UnbindEvents()
         {
             if (_enabledToggle != null)
             {
