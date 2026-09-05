@@ -122,3 +122,17 @@ MediaPipeUnityDOTS/
 - 잔류: `OneEuroFilterSettingsPanel`, `HandTrackingStatusPanel`
   (App 레이어 UI), `WebcamBackgroundRenderer`, `WebcamBackgroundToggle`
   (데모 씬 전용), `NativeSmokeTest`(+Editor 러너, 진단용).
+
+## 패키지 목표와 외부 소비 계약
+
+이 저장소의 목표는 `Runtime`의 Unity 패키지(UPM)화다. 패키지 경계가
+성립하려면 브리지를 통해 얻은 값이 외부에서 가공하기 쉬워야 한다.
+
+- 외부 소비자는 `Runtime` 어셈블리만으로 값을 읽는다.
+  `Sample`/UI 어셈블리 참조 없이 접근 가능해야 한다.
+- 읽기 API(`Get*Landmark` 접근자, 스냅샷 복사 API)는 `Runtime`에 둔다.
+  가공용 DTO·어댑터는 소비 측(App 레이어) 책임이다.
+- ABI 변경은 세 가드로 버전 관리한다:
+  네이티브 `static_assert` + C# `ExpectedSize` + `NativeAbiTests`.
+- `Runtime`에 UI(App 레이어) 의존을 넣지 않는다
+  (R3/UniTask/VContainer/UI Toolkit 금지 — AGENTS.md UI/ECS 경계).
