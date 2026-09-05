@@ -241,4 +241,72 @@ namespace MediaPipeUnityDots.Runtime.Interop
         public float minDetectionConfidence;
         public float minTrackingConfidence;
     }
+    [StructLayout(LayoutKind.Sequential)]
+    public unsafe struct MpudHolisticResult
+    {
+        public const int FaceLandmarks = 478;
+        public const int PoseLandmarks = 33;
+        public const int HandLandmarks = 21;
+
+        // 부위별: count(int) 4개 + timestamp(long) + 2765 floats.
+        // C MpudHolisticResult와 바이트 일치. 8바이트 정렬 끝 패딩 4바이트 포함 11088.
+        public const int ExpectedSize = 11088;
+
+        private const int FaceFloats = FaceLandmarks * 5;
+        private const int PoseFloats = PoseLandmarks * 5;
+        private const int HandFloats = HandLandmarks * 5;
+
+        public int faceLandmarkCount;
+        public int poseLandmarkCount;
+        public int leftHandLandmarkCount;
+        public int rightHandLandmarkCount;
+        public long timestampUs;
+        public fixed float landmarkData[FaceFloats + PoseFloats + HandFloats * 2];
+
+        public MpudNormalizedLandmark GetFaceLandmark(int i)
+        {
+            return GetLandmark(0, FaceLandmarks, faceLandmarkCount, i);
+        }
+
+        public MpudNormalizedLandmark GetPoseLandmark(int i)
+        {
+            return GetLandmark(FaceFloats, PoseLandmarks, poseLandmarkCount, i);
+        }
+
+        public MpudNormalizedLandmark GetLeftHandLandmark(int i)
+        {
+            return GetLandmark(FaceFloats + PoseFloats, HandLandmarks, leftHandLandmarkCount, i);
+        }
+
+        public MpudNormalizedLandmark GetRightHandLandmark(int i)
+        {
+            return GetLandmark(FaceFloats + PoseFloats + HandFloats, HandLandmarks, rightHandLandmarkCount, i);
+        }
+
+        private MpudNormalizedLandmark GetLandmark(int baseOffset, int capacity, int count, int i)
+        {
+            if (i < 0 || i >= count || i >= capacity)
+            {
+                throw new ArgumentOutOfRangeException(nameof(i));
+            }
+
+            var offset = baseOffset + i * 5;
+            return new MpudNormalizedLandmark
+            {
+                x = landmarkData[offset],
+                y = landmarkData[offset + 1],
+                z = landmarkData[offset + 2],
+                visibility = landmarkData[offset + 3],
+                presence = landmarkData[offset + 4],
+            };
+        }
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    public struct MpudHolisticTrackerConfig
+    {
+        public IntPtr modelAssetPath;
+        public float minDetectionConfidence;
+        public float minPresenceConfidence;
+    }
 }

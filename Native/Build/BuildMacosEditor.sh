@@ -179,6 +179,21 @@ else:
 PY
 }
 
+# --- XNNPACK SME 오타 교정: sme=false 분기가 존재하지 않는 SRM 매크로를 내보내 빌드가 깨짐 ---
+fix_xnnpack_sme_typo() {
+    local BAZEL_OUTPUT
+    BAZEL_OUTPUT="$("$BAZEL_CMD" "${BAZEL_STARTUP_FLAGS[@]}" info output_base 2>/dev/null || true)"
+    if [ -z "$BAZEL_OUTPUT" ]; then
+        return
+    fi
+
+    local BUILD_DEFS="$BAZEL_OUTPUT/external/XNNPACK/build_defs.bzl"
+    if [ -f "$BUILD_DEFS" ] && grep -q "XNN_ENABLE_SRM_SME" "$BUILD_DEFS"; then
+        echo "[Fix] XNNPACK build_defs.bzl: SME 오타 교정"
+        sed -i '' 's/XNN_ENABLE_SRM_SME/XNN_ENABLE_ARM_SME/g' "$BUILD_DEFS"
+    fi
+}
+
 # fetch → toolchain 바이너리 생성 → 패치
 echo "[Build] Fetching dependencies..."
 "$BAZEL_CMD" "${BAZEL_STARTUP_FLAGS[@]}" fetch "${BAZEL_FETCH_FLAGS[@]}" \
@@ -186,6 +201,7 @@ echo "[Build] Fetching dependencies..."
 
 fix_bazel_toolchain_uuid
 fix_zlib_fdopen
+fix_xnnpack_sme_typo
 
 echo "[Build] Building libmpud_bridge.dylib..."
 "$BAZEL_CMD" "${BAZEL_STARTUP_FLAGS[@]}" build "${BAZEL_FETCH_FLAGS[@]}" -c opt \

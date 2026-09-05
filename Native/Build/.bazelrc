@@ -7,6 +7,9 @@ build --cpu=darwin_arm64
 build --apple_platform_type=macos
 build --macos_minimum_os=10.16
 build --define=MEDIAPIPE_DISABLE_GPU=1
+# Holistic 양자화 모델이 Apple Silicon XNNPACK SME/SME2 커널에서 SIGILL로 죽으므로 제외 (NEON/I8MM/DotProd 유지)
+build --define=xnn_enable_arm_sme=false
+build --define=xnn_enable_arm_sme2=false
 
 # MediaPipe v1.0.0의 api3/node는 consteval을 사용하므로 C++20 필요
 build --cxxopt=-std=c++20

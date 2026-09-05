@@ -38,6 +38,9 @@ namespace MediaPipeUnityDots.Sample.HandTracking.Scripts
         private Entity _singletonEntity;
         private long _submitCount;
         private long _lastCopiedTimestamp;
+        // TEMP 진단용. 원인 확정 후 SampleHash/DumpInvalidFrame와 함께 삭제.
+        private int _prevHash;
+        private int _invalidDumpCount;
 
         private void OnEnable()
         {
@@ -80,13 +83,32 @@ namespace MediaPipeUnityDots.Sample.HandTracking.Scripts
                 return;
             }
 
+            // TEMP 진단: 무효 프레임의 입력 영상 동결/지연 여부 판별용. 원인 확정 후 삭제.
+            var hash = SampleHash(pixels);
+            var submitStart = Time.realtimeSinceStartup;
             var previousFrameCount = _service.LatestFrameCount;
             _service.SubmitAndPoll(pixels, width, height, _webcamSource.LatestFlipVertically);
+            var latencyMs = (Time.realtimeSinceStartup - submitStart) * 1000f;
 
             if (_service.LatestFrameCount == previousFrameCount)
             {
                 return;
             }
+
+            if (!_service.LatestIsValid)
+            {
+                Debug.LogWarning($"[MPUD][DIAG] face invalid | hash={hash} sameAsPrev={hash == _prevHash} latencyMs={latencyMs:F1}");
+                // TEMP 진단: 무효 프레임 영상 3장 저장. 원인 확정 후 삭제.
+                if (_invalidDumpCount < 3)
+                {
+                    _invalidDumpCount++;
+                    DumpInvalidFrame(pixels, width, height);
+                }
+            }
+
+            _prevHash = hash;
+
+            _submitCount++;
 
             if (_logIntervalFrames > 0 && _submitCount % _logIntervalFrames == 0)
             {
@@ -213,6 +235,39 @@ namespace MediaPipeUnityDots.Sample.HandTracking.Scripts
                         landmarks[bufferIndex] = new FaceLandmarkElement { FaceIndex = -1 };
                     }
                 }
+            }
+        }
+
+        // TEMP 진단용. 입력 영상이 프레임마다 바뀌는지 판별하는 cheap 해시. 원인 확정 후 삭제.
+        private static int SampleHash(Color32[] pixels)
+        {
+            var hash = 0;
+            for (var i = 0; i < pixels.Length; i += 4097)
+            {
+                hash = hash * 31 + pixels[i].r + pixels[i].g * 2 + pixels[i].b * 3;
+            }
+
+            return hash;
+        }
+
+        // TEMP 진단용. 무효 프레임 영상을 PNG로 저장한다. 원인 확정 후 삭제.
+        private static void DumpInvalidFrame(Color32[] pixels, int width, int height)
+        {
+            try
+            {
+                var tex = new Texture2D(width, height, TextureFormat.RGBA32, false);
+                tex.SetPixels32(pixels);
+                tex.Apply();
+                var path = System.IO.Path.Combine(
+                    Application.persistentDataPath,
+                    $"face_invalid_{System.DateTime.Now:HHmmss_fff}.png");
+                System.IO.File.WriteAllBytes(path, tex.EncodeToPNG());
+                UnityEngine.Object.Destroy(tex);
+                Debug.LogWarning($"[MPUD][DIAG] dumped {path}");
+            }
+            catch (System.Exception exception)
+            {
+                Debug.LogWarning($"[MPUD][DIAG] dump failed: {exception.Message}");
             }
         }
 
