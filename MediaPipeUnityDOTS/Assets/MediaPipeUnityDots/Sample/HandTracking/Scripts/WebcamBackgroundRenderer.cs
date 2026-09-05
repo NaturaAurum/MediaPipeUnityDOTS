@@ -1,3 +1,6 @@
+using MediaPipeUnityDots.Runtime.Ecs;
+using Unity.Entities;
+using Unity.Mathematics;
 using UnityEngine;
 
 namespace MediaPipeUnityDots.Sample.HandTracking.Scripts
@@ -9,7 +12,7 @@ namespace MediaPipeUnityDots.Sample.HandTracking.Scripts
     /// </summary>
     public sealed class WebcamBackgroundRenderer : MonoBehaviour
     {
-        // 랜드마크 평면(z≈0)보다 뒤, far(1000)보다 훨씬 앞.
+        // 랜드마크는 이 Quad 평면(+앞 0.05)에 정합 배치한다. UV 크롭식과 함께 매핑을 발행한다.
         private const float BackgroundDistance = 15f;
         private const string UnlitShaderName = "Universal Render Pipeline/Unlit";
         private const string QuadMeshName = "Quad.fbx";
@@ -22,6 +25,9 @@ namespace MediaPipeUnityDots.Sample.HandTracking.Scripts
         private MeshFilter _quadFilter;
         [SerializeField]
         private MeshRenderer _quadRenderer;
+
+        private World _cachedWorld;
+        private Entity _mappingEntity;
 
         private Material _material;
         private bool _visible = true;
@@ -71,12 +77,14 @@ namespace MediaPipeUnityDots.Sample.HandTracking.Scripts
             if (video == null || video.width <= 0 || video.height <= 0)
             {
                 _quadRenderer.enabled = false;
+                PublishOverlayMappingInvalid();
                 return;
             }
 
             _quadRenderer.enabled = _visible;
             FitQuadToFrustum();
-            UpdateCoverUv(video);
+            UpdateCoverUv(video, out var uvScale, out var uvOffset);
+            PublishOverlayMapping(video, uvScale, uvOffset);
         }
 
         private void OnDisable()
@@ -97,8 +105,7 @@ namespace MediaPipeUnityDots.Sample.HandTracking.Scripts
             var height = 2f * BackgroundDistance * Mathf.Tan(_camera.fieldOfView * 0.5f * Mathf.Deg2Rad);
             _quadRenderer.transform.localScale = new Vector3(height * _camera.aspect, height, 1f);
         }
-
-        private void UpdateCoverUv(WebCamTexture video)
+        private void UpdateCoverUv(WebCamTexture video, out Vector2 uvScale, out Vector2 uvOffset)
         {
             if (_material.mainTexture != video)
             {
@@ -129,6 +136,88 @@ namespace MediaPipeUnityDots.Sample.HandTracking.Scripts
 
             _material.mainTextureScale = scale;
             _material.mainTextureOffset = offset;
+            uvScale = scale;
+            uvOffset = offset;
+        }
+
+        private void PublishOverlayMappingInvalid()
+        {
+            if (!TryGetMappingEntity(out var entityManager, out var entity))
+            {
+                return;
+            }
+
+            var mapping = entityManager.GetComponentData<LandmarkOverlayMapping>(entity);
+            mapping.IsValid = 0;
+            entityManager.SetComponentData(entity, mapping);
+        }
+
+        private void PublishOverlayMapping(WebCamTexture video, Vector2 uvScale, Vector2 uvOffset)
+        {
+            if (!TryGetMappingEntity(out var entityManager, out var entity))
+            {
+                return;
+            }
+
+            var quadTransform = _quadRenderer.transform;
+            entityManager.SetComponentData(entity, new LandmarkOverlayMapping
+            {
+                IsValid = 1,
+                Flipped = video.videoVerticallyMirrored ? 1 : 0,
+                UvScaleX = uvScale.x,
+                UvOffsetX = uvOffset.x,
+                UvScaleY = uvScale.y,
+                UvOffsetY = uvOffset.y,
+                Origin = quadTransform.position,
+                AxisX = (float3)quadTransform.right * quadTransform.localScale.x,
+                AxisY = (float3)quadTransform.up * quadTransform.localScale.y,
+                Forward = quadTransform.forward,
+            });
+        }
+
+        private bool TryGetMappingEntity(out EntityManager entityManager, out Entity entity)
+        {
+            entityManager = default;
+            entity = Entity.Null;
+
+            var world = World.DefaultGameObjectInjectionWorld;
+            if (world is not { IsCreated: true })
+            {
+                return false;
+            }
+
+            if (_cachedWorld != world || _mappingEntity == Entity.Null)
+            {
+                _cachedWorld = world;
+                _mappingEntity = Entity.Null;
+                var query = world.EntityManager.CreateEntityQuery(typeof(LandmarkOverlayMapping));
+                try
+                {
+                    if (query.CalculateEntityCount() == 1)
+                    {
+                        _mappingEntity = query.GetSingletonEntity();
+                    }
+                }
+                finally
+                {
+                    query.Dispose();
+                }
+
+                if (_mappingEntity == Entity.Null)
+                {
+                    _mappingEntity = world.EntityManager.CreateEntity(typeof(LandmarkOverlayMapping));
+                }
+            }
+
+            if (!world.EntityManager.Exists(_mappingEntity))
+            {
+                _mappingEntity = Entity.Null;
+                return false;
+            }
+
+            entityManager = world.EntityManager;
+            entity = _mappingEntity;
+            return true;
         }
     }
 }
