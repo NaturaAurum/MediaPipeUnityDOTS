@@ -22,6 +22,7 @@ namespace MediaPipeUnityDots.Sample.HandTracking.Scripts
         private World _cachedWorld;
         private Entity _settingsEntity;
 
+        private VisualElement _panelElement;
         private Toggle _enabledToggle;
         private Slider _handMinCutoff;
         private Slider _handBeta;
@@ -30,6 +31,8 @@ namespace MediaPipeUnityDots.Sample.HandTracking.Scripts
         private Slider _poseMinCutoff;
         private Slider _poseBeta;
         private Button _resetButton;
+
+        internal int PushCount { get; private set; }
 
         private void OnEnable()
         {
@@ -51,56 +54,81 @@ namespace MediaPipeUnityDots.Sample.HandTracking.Scripts
                 _panelRenderer.UnregisterUIReloadCallback(OnUIReload);
             }
 
-            _enabledToggle = null;
-            _handMinCutoff = null;
-            _handBeta = null;
-            _faceMinCutoff = null;
-            _faceBeta = null;
-            _poseMinCutoff = null;
-            _poseBeta = null;
-            _resetButton = null;
+            UnbindEvents();
         }
 
+        // version은 무시하고 매번 리바인딩한다. OnDisable에서 참조를 비우므로 가드 시 stale 위험이 있다.
         private void OnUIReload(PanelRenderer renderer, VisualElement root, int version)
         {
-            var panel = root.Q<VisualElement>("filter-settings-panel");
-            if (panel == null && _settingsUxml != null)
-            {
-                _settingsUxml.CloneTree(root);
-                panel = root.Q<VisualElement>("filter-settings-panel");
-            }
+            BindToRoot(root);
+        }
 
-            if (panel == null)
+        internal void BindToRoot(VisualElement root)
+        {
+            UnbindEvents();
+
+            if (root == null)
             {
                 return;
             }
 
-            _enabledToggle = panel.Q<Toggle>("filter-enabled-toggle");
-            _handMinCutoff = panel.Q<Slider>("hand-min-cutoff");
-            _handBeta = panel.Q<Slider>("hand-beta");
-            _faceMinCutoff = panel.Q<Slider>("face-min-cutoff");
-            _faceBeta = panel.Q<Slider>("face-beta");
-            _poseMinCutoff = panel.Q<Slider>("pose-min-cutoff");
-            _poseBeta = panel.Q<Slider>("pose-beta");
-            _resetButton = panel.Q<Button>("reset-defaults-button");
+            _panelElement = root.Q<VisualElement>("filter-settings-panel");
+            if (_panelElement == null && _settingsUxml != null)
+            {
+                _settingsUxml.CloneTree(root);
+                _panelElement = root.Q<VisualElement>("filter-settings-panel");
+            }
+
+            if (_panelElement == null)
+            {
+                return;
+            }
+
+            _enabledToggle = _panelElement.Q<Toggle>("filter-enabled-toggle");
+            _handMinCutoff = _panelElement.Q<Slider>("hand-min-cutoff");
+            _handBeta = _panelElement.Q<Slider>("hand-beta");
+            _faceMinCutoff = _panelElement.Q<Slider>("face-min-cutoff");
+            _faceBeta = _panelElement.Q<Slider>("face-beta");
+            _poseMinCutoff = _panelElement.Q<Slider>("pose-min-cutoff");
+            _poseBeta = _panelElement.Q<Slider>("pose-beta");
+            _resetButton = _panelElement.Q<Button>("reset-defaults-button");
 
             SyncUiFromSettings();
 
             if (_enabledToggle != null)
             {
-                _enabledToggle.RegisterValueChangedCallback(evt =>
-                {
-                    _settings.Enabled = evt.newValue ? 1 : 0;
-                    PushSettingsToEcs();
-                });
+                _enabledToggle.RegisterValueChangedCallback(OnEnabledToggleChanged);
             }
 
-            RegisterSliderCallback(_handMinCutoff, val => _settings.HandMinCutoff = val);
-            RegisterSliderCallback(_handBeta, val => _settings.HandBeta = val);
-            RegisterSliderCallback(_faceMinCutoff, val => _settings.FaceMinCutoff = val);
-            RegisterSliderCallback(_faceBeta, val => _settings.FaceBeta = val);
-            RegisterSliderCallback(_poseMinCutoff, val => _settings.PoseMinCutoff = val);
-            RegisterSliderCallback(_poseBeta, val => _settings.PoseBeta = val);
+            if (_handMinCutoff != null)
+            {
+                _handMinCutoff.RegisterValueChangedCallback(OnHandMinCutoffChanged);
+            }
+
+            if (_handBeta != null)
+            {
+                _handBeta.RegisterValueChangedCallback(OnHandBetaChanged);
+            }
+
+            if (_faceMinCutoff != null)
+            {
+                _faceMinCutoff.RegisterValueChangedCallback(OnFaceMinCutoffChanged);
+            }
+
+            if (_faceBeta != null)
+            {
+                _faceBeta.RegisterValueChangedCallback(OnFaceBetaChanged);
+            }
+
+            if (_poseMinCutoff != null)
+            {
+                _poseMinCutoff.RegisterValueChangedCallback(OnPoseMinCutoffChanged);
+            }
+
+            if (_poseBeta != null)
+            {
+                _poseBeta.RegisterValueChangedCallback(OnPoseBetaChanged);
+            }
 
             if (_resetButton != null)
             {
@@ -108,18 +136,103 @@ namespace MediaPipeUnityDots.Sample.HandTracking.Scripts
             }
         }
 
-        private void RegisterSliderCallback(Slider slider, System.Action<float> applyValue)
+        internal void UnbindEvents()
         {
-            if (slider == null)
+            if (_enabledToggle != null)
             {
-                return;
+                _enabledToggle.UnregisterValueChangedCallback(OnEnabledToggleChanged);
+                _enabledToggle = null;
             }
 
-            slider.RegisterValueChangedCallback(evt =>
+            if (_handMinCutoff != null)
             {
-                applyValue(evt.newValue);
-                PushSettingsToEcs();
-            });
+                _handMinCutoff.UnregisterValueChangedCallback(OnHandMinCutoffChanged);
+                _handMinCutoff = null;
+            }
+
+            if (_handBeta != null)
+            {
+                _handBeta.UnregisterValueChangedCallback(OnHandBetaChanged);
+                _handBeta = null;
+            }
+
+            if (_faceMinCutoff != null)
+            {
+                _faceMinCutoff.UnregisterValueChangedCallback(OnFaceMinCutoffChanged);
+                _faceMinCutoff = null;
+            }
+
+            if (_faceBeta != null)
+            {
+                _faceBeta.UnregisterValueChangedCallback(OnFaceBetaChanged);
+                _faceBeta = null;
+            }
+
+            if (_poseMinCutoff != null)
+            {
+                _poseMinCutoff.UnregisterValueChangedCallback(OnPoseMinCutoffChanged);
+                _poseMinCutoff = null;
+            }
+
+            if (_poseBeta != null)
+            {
+                _poseBeta.UnregisterValueChangedCallback(OnPoseBetaChanged);
+                _poseBeta = null;
+            }
+
+            if (_resetButton != null)
+            {
+                _resetButton.clicked -= OnResetClicked;
+                _resetButton = null;
+            }
+
+            if (_panelElement != null)
+            {
+                _panelElement.RemoveFromHierarchy();
+                _panelElement = null;
+            }
+        }
+
+        private void OnEnabledToggleChanged(ChangeEvent<bool> evt)
+        {
+            _settings.Enabled = evt.newValue ? 1 : 0;
+            PushSettingsToEcs();
+        }
+
+        private void OnHandMinCutoffChanged(ChangeEvent<float> evt)
+        {
+            _settings.HandMinCutoff = evt.newValue;
+            PushSettingsToEcs();
+        }
+
+        private void OnHandBetaChanged(ChangeEvent<float> evt)
+        {
+            _settings.HandBeta = evt.newValue;
+            PushSettingsToEcs();
+        }
+
+        private void OnFaceMinCutoffChanged(ChangeEvent<float> evt)
+        {
+            _settings.FaceMinCutoff = evt.newValue;
+            PushSettingsToEcs();
+        }
+
+        private void OnFaceBetaChanged(ChangeEvent<float> evt)
+        {
+            _settings.FaceBeta = evt.newValue;
+            PushSettingsToEcs();
+        }
+
+        private void OnPoseMinCutoffChanged(ChangeEvent<float> evt)
+        {
+            _settings.PoseMinCutoff = evt.newValue;
+            PushSettingsToEcs();
+        }
+
+        private void OnPoseBetaChanged(ChangeEvent<float> evt)
+        {
+            _settings.PoseBeta = evt.newValue;
+            PushSettingsToEcs();
         }
 
         private void OnResetClicked()
@@ -142,6 +255,7 @@ namespace MediaPipeUnityDots.Sample.HandTracking.Scripts
 
         private void PushSettingsToEcs()
         {
+            PushCount++;
             if (TryGetSettingsEntity(out var entityManager, out var entity))
             {
                 entityManager.SetComponentData(entity, _settings);
