@@ -35,95 +35,94 @@ Native/Build/BuildMacosEditor.sh
 Native/Build/CopyArtifactsToUnity.sh
 ```
 
-## 산출물 경로
+## 산출물과 모델
 
-| 산출물 | 경로 | 설명 |
-|--------|------|------|
-| dylib (빌드 결과) | `Native/Artifacts/MacosEditor/libmpud_bridge.dylib` | Bazel 빌드 산출물 복사본 |
-| dylib (Unity 플러그인) | `MediaPipeUnityDOTS/Assets/Plugins/macOS/libmpud_bridge.dylib` | `CopyArtifactsToUnity.sh`가 복사 + fixup |
-| 모델 파일 | `MediaPipeUnityDOTS/Assets/StreamingAssets/MediaPipe/Models/hand_landmarker.task` | `DownloadModels.sh`가 다운로드 |
+| 구분 | 경로 | 설명 |
+|------|------|------|
+| dylib (빌드 결과) | `Native/Artifacts/MacosEditor/libmpud_bridge.dylib` | Bazel 산출물 복사본 |
+| dylib (Unity 플러그인) | `MediaPipeUnityDOTS/Assets/Plugins/macOS/libmpud_bridge.dylib` | `CopyArtifactsToUnity.sh`가 복사, install name 보정, ad-hoc 서명 |
+| 모델 | `MediaPipeUnityDOTS/Assets/StreamingAssets/MediaPipe/Models/` | 다운로드 대상. Git에는 `.meta`만 추적 |
 
-> dylib와 모델 파일은 `.gitignore`에 등록되어 있습니다. clone 후 빌드/다운로드 스크립트로 재생성합니다.
+`DownloadModels.sh`는 아래 공식 float16 task bundle을 내려받는다.
 
-## Unity에서의 플러그인 임포트
+- `hand_landmarker.task`
+- `face_landmarker.task`
+- `pose_landmarker_full.task`
+- `holistic_landmarker.task`
 
-`CopyArtifactsToUnity.sh` 실행 후 Unity Editor를 열면 (또는 이미 열려있으면 자동 refresh) 플러그인이 인식됩니다.
+## 브리지 구성
 
-### 동작 원리
+| 종류 | 네이티브 브리지 | Unity 프레임 프로바이더 |
+|------|------|------|
+| Hand | `mpud_bridge.*` | `WebcamFrameProvider` |
+| Face | `mpud_face_bridge.*` | `FaceFrameProvider` |
+| Pose | `mpud_pose_bridge.*` | `PoseFrameProvider` |
+| Holistic | `mpud_holistic_bridge.*` | `HolisticFrameProvider` |
 
-1. `Assets/Plugins/macOS/` 디렉토리에 `.dylib`를 두면 Unity가 **macOS 전용 네이티브 플러그인**으로 자동 인식
-2. C# 코드에서 `[DllImport("mpud_bridge")]`로 참조 — Unity가 플랫폼별로 `lib` 접두사 + `.dylib` 확장자를 자동 해석
-3. `CopyArtifactsToUnity.sh`가 `install_name_tool -id @loader_path/libmpud_bridge.dylib`을 적용하여 Unity의 로딩 경로와 맞춤
-4. macOS Gatekeeper를 위해 `codesign --force -s -` (ad-hoc 서명) 적용
-5. `MediaPipeUnityDOTS/Assets/Plugins/macOS/libmpud_bridge.dylib.meta`에 Editor용 `PluginImporter` 설정을 저장해 fresh import drift를 줄임
+`NativeStructs.cs`와 `MpudBridge.cs`는 네이티브 ABI를 C#에 미러한다. Holistic은 Face, Pose, Left/Right Hand 결과를 기존 ECS 추적 데이터로 전달한다.
 
-### C# Interop 파일
+## 검증
 
+### Unity Editor
+
+`CopyArtifactsToUnity.sh` 실행 후 Unity에서 **MediaPipe > Run Smoke Test**를 실행한다. 이 메뉴는 Hand tracker의 create/destroy와 플러그인 로딩을 확인한다.
+
+### 네이티브 전체 스모크
+
+합성 RGBA 프레임으로 Hand, Face, Pose, Holistic의 create/submit/poll/destroy를 확인한다. 먼저 `BuildMacosEditor.sh`로 bridge 동기화와 submodule 패치를 적용한 뒤 모든 모델을 내려받고 실행한다.
+
+```bash
+(cd Native/Upstream/mediapipe && \
+  HERMETIC_PYTHON_VERSION=3.11 bazelisk \
+    --bazelrc=../../Build/.bazelrc \
+    build -c opt //mediapipe/mpud_bridge:mpud_smoke_test && \
+  bazel-bin/mediapipe/mpud_bridge/mpud_smoke_test \
+    ../../../MediaPipeUnityDOTS/Assets/StreamingAssets/MediaPipe/Models)
 ```
-Assets/MediaPipeUnityDots/Runtime/Interop/
-├── NativeStructs.cs    ← C 구조체 미러 (MpudHandResult, MpudImageFrame, MpudHandTrackerConfig)
-└── MpudBridge.cs       ← DllImport 선언 (6개 함수, CallingConvention.Cdecl)
+
+성공 기준: 마지막 줄이 `SMOKE OK`.
+
+## 빌드 워크어라운드
+
+`BuildMacosEditor.sh`는 fetch 뒤 아래 보정을 조건부로 적용한다.
+
+1. **Hermetic Python 3.11** — 로컬 기본 Python과 무관하게 MediaPipe requirements lock에 맞춘다.
+2. **macOS 26+ Bazel toolchain UUID** — `wrapped_clang` 및 `libtool_check_unique`에 `LC_UUID`가 없을 때만 재빌드한다.
+3. **vendored zlib `fdopen` 매크로** — macOS 26 SDK와 충돌하는 정의를 제거한다.
+4. **XNNPACK SME 오타** — 사용 중인 XNNPACK의 `XNN_ENABLE_SRM_SME`를 `XNN_ENABLE_ARM_SME`로 교정한다.
+
+### Apple Silicon XNNPACK SME/SME2
+
+`Native/Build/.bazelrc`는 다음 두 플래그를 항상 적용한다.
+
+```text
+--define=xnn_enable_arm_sme=false
+--define=xnn_enable_arm_sme2=false
 ```
 
-### 검증 방법
+Holistic bundle의 양자화 추론이 Apple Silicon에서 SME/SME2 커널을 선택하면 `SIGILL`이 발생한다. 두 커널만 제외하며 XNNPACK CPU delegate와 NEON/I8MM/DotProd 경로는 유지한다. 위 오타 교정은 upstream XNNPACK이 수정되면 자동으로 건너뛴다.
 
-Unity Editor 메뉴 → **MediaPipe > Run Smoke Test** 실행. Console에 아래 로그가 나오면 정상:
+## 패치와 동기화
 
-```
-[MPUD Smoke] create_hand_tracker status: 0
-[MPUD Smoke] Tracker created successfully!
-[MPUD Smoke] destroy_hand_tracker completed
-[MPUD Smoke] === Smoke Test Complete (no crash) ===
-```
-
-## 패치 파일
-
-`Native/Patches/mediapipe/` 아래 패치들이 있으며, `SyncBridgeIntoWorkspace.sh`가 빌드 시 자동 적용합니다.
+`SyncBridgeIntoWorkspace.sh`는 `Native/Bridge/`의 헤더, 소스, BUILD overlay를 submodule의 `mediapipe/mpud_bridge/`로 복사하고 다음 패치를 멱등 적용한다.
 
 | 패치 | 대상 | 역할 |
 |------|------|------|
-| `macos_arm64_compat.diff` | WORKSPACE, `opencv_macos.BUILD` | Apple Silicon Homebrew 경로 + OpenCV 4 include/layout 반영 (`PREFIX=opt/opencv@4`) |
-| `module_compat.diff` | `MODULE.bazel` | `apple_support`를 `rules_cc`보다 먼저 선언하여 Apple toolchain 우선 등록 + `rules_java 7.10.0 → 7.11.0` (JRE fallback 버그 수정) |
+| `macos_arm64_compat.diff` | `WORKSPACE`, `opencv_macos.BUILD` | Apple Silicon Homebrew 경로와 OpenCV 4 include/layout |
+| `module_compat.diff` | `MODULE.bazel` | Apple toolchain 우선 등록과 `rules_java` 호환 |
 
-> `tasks_logging_analytics_compat.diff`는 v0.10.33에서 필요했으나 v1.0.0에서는 upstream에서 해당 `mediapipe/util/analytics` 의존성이 제거되어 삭제되었습니다.
-
-## macOS 26+ 빌드 워크어라운드
-
-`BuildMacosEditor.sh`는 `bazelisk`를 통해 Bazel 7.4.1을 사용하며, 아래 보정을 조건부로 적용합니다:
-
-1. **Hermetic Python 3.11 기본값** — 로컬 기본 `python3`가 3.14 이상이어도 `HERMETIC_PYTHON_VERSION=3.11`를 기본 적용해 MediaPipe의 requirements lock과 맞춥니다. (MODULE.bazel `python_version = "3.11"`)
-2. **`wrapped_clang` / `libtool_check_unique` LC_UUID 누락** — Bazel toolchain 바이너리에 `LC_UUID`가 없을 때만 소스에서 `-Wl,-random_uuid`를 붙여 재컴파일합니다.
-3. **vendored zlib `fdopen` 매크로 충돌** — fetched `zutil.h`에 대상 블록이 존재할 때만 `fdopen` 재정의 블록을 안전하게 치환합니다. 이 보정은 macOS 26 SDK 충돌 대응을 위해 추가되었습니다. (v1.0.0은 zlib 1.3.1)
-
-> LC_UUID 보정은 이미 UUID가 있으면 skip되고, zlib 보정은 `zutil.h`에 대상 블록이 없으면 skip됩니다.
+submodule HEAD는 v1.0.0에 고정하고, 동기화 복사본과 패치 적용 결과는 커밋하지 않는다.
 
 ## 디렉토리 구조
 
-```
+```text
 Native/
-├── Upstream/
-│   └── mediapipe/          # git submodule (v1.0.0)
+├── Upstream/mediapipe/      # google-ai-edge/mediapipe submodule (v1.0.0)
 ├── Bridge/
-│   ├── Include/            # C ABI 헤더 (mpud_bridge.h)
-│   ├── Src/                # C++ 구현 (mpud_bridge.cc)
-│   └── BazelOverlay/       # BUILD 파일
-├── Build/
-│   ├── .bazelrc            # macOS Apple Silicon 빌드 설정 (Bzlmod 대응)
-│   ├── SyncBridgeIntoWorkspace.sh
-│   ├── BuildMacosEditor.sh
-│   ├── CopyArtifactsToUnity.sh
-│   └── DownloadModels.sh
-├── Patches/
-│   └── mediapipe/
-│       ├── macos_arm64_compat.diff
-│       └── module_compat.diff
-└── Artifacts/
-    └── MacosEditor/        # 빌드 산출물 (.dylib)
+│   ├── Include/             # Hand/Face/Pose/Holistic C ABI
+│   ├── Src/                 # 브리지 구현과 mpud_smoke_test
+│   └── BazelOverlay/        # libmpud_bridge와 스모크 BUILD
+├── Build/                   # 다운로드, 동기화, 빌드, Unity 복사 스크립트
+├── Patches/mediapipe/       # submodule에 멱등 적용할 호환 패치
+└── Artifacts/MacosEditor/   # 생성된 dylib
 ```
-
-## PoC 이후 전환 검토
-
-현재 git submodule + file sync 방식을 사용합니다. 안정화 이후 `http_archive` + patches 방식(MediaPipeUnityPlugin과 동일)으로의 전환을 검토합니다.
-
-- **submodule**: 디버깅 용이성, 로컬 수정 즉시 반영
-- **http_archive**: 재현성과 패치 관리 통합, CI 환경에서 유리
