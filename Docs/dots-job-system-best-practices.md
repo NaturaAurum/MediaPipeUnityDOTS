@@ -1,6 +1,6 @@
 # Unity DOTS (ECS, Job System, Burst) 아키텍처 및 Best Practice R&D 보고서
 
-본 문서는 **Unity 6 (6000.3.11f1)** 및 **Entities 6.6.0** 환경에서 MediaPipe 실시간 트래킹 파이프라인(Hand, Face, Pose, Holistic)을 최고 성능과 무결성으로 구동하기 위한 Unity DOTS(Data-Oriented Technology Stack) 최적 설계 패턴, 핵심 지침, 그리고 권장 시스템 아키텍처를 정의한다.
+본 문서는 **Unity 6 (6000.6.0f1)** 및 **Entities 6.6.0** 환경에서 MediaPipe 실시간 트래킹 파이프라인(Hand, Face, Pose, Holistic)을 최고 성능과 무결성으로 구동하기 위한 Unity DOTS(Data-Oriented Technology Stack) 최적 설계 패턴, 핵심 지침, 그리고 권장 시스템 아키텍처를 정의한다.
 
 ---
 
@@ -241,7 +241,7 @@ flowchart TD
 - **책임**:
   1. 각 포인트 엔티티의 `HandIndex`/`FaceIndex` 및 `Index`를 기반으로 입력 버퍼 매핑.
   2. 트래킹 유효성 검사 및 `LandmarkVisibleTag` 켜기/끄기 (`IEnableableComponent`).
-  3. `OneEuroFilterMath`를 통한 3축 지터 억제 (Burst SIMD).
+  3. `OneEuroFilter.Filter`를 통한 3축 지터 억제 (Burst SIMD, `Enabled` 내장).
   4. 배경 Quad 화면 비율에 맞춘 `LandmarkOverlayMapping` 변환 후 `LocalTransform` 갱신.
 
 #### 계층 3: 렌더링 계층 (`Entities.Graphics`)
@@ -358,23 +358,16 @@ namespace MediaPipeUnityDots.Runtime.Ecs
                     var element = Landmarks[bufferIndex];
                     float3 targetPos;
 
-                    if (FilterSettings.Enabled != 0)
-                    {
-                        var rawPos = new float3(element.X, element.Y, element.Z);
-                        var filtered = OneEuroFilter.Filter(
-                            rawPos,
-                            ref filter,
-                            MinCutoff,
-                            Beta,
-                            FilterSettings.DerivativeCutoffHz,
-                            InputTimestampUs);
-                        targetPos = LandmarkOverlayMapping.Map(filtered.x, filtered.y, in Mapping);
-                    }
-                    else
-                    {
-                        filter.Initialized = 0;
-                        targetPos = LandmarkOverlayMapping.Map(element.X, element.Y, in Mapping);
-                    }
+                    // Enabled는 Filter 내부 계약. 외부 분기 금지.
+                    var filtered = OneEuroFilter.Filter(
+                        new float3(element.X, element.Y, element.Z),
+                        ref filter,
+                        FilterSettings.Enabled,
+                        MinCutoff,
+                        Beta,
+                        FilterSettings.DerivativeCutoffHz,
+                        InputTimestampUs);
+                    targetPos = LandmarkOverlayMapping.Map(filtered.x, filtered.y, in mapping);
 
                     transform = LocalTransform.FromPositionRotationScale(targetPos, quaternion.identity, PointScale);
                     isVisible.ValueRW = true; // 렌더 활성화
@@ -413,6 +406,11 @@ namespace MediaPipeUnityDots.Runtime.Ecs
 entityManager.AddComponentData(entity, new LandmarkVisibleTag());
 entityManager.SetComponentEnabled<LandmarkVisibleTag>(entity, false);
 ```
+
+> **적용 보류 (실측)**: 설치된 Entities Graphics의 `DisableRendering`은 enableable이
+> 아니고, 커스텀 태그는 BRG 쿼리에 포함되지 않아 실제 컬링이 안 된다.
+> `Scale = 0f` 유지를 기본값으로 두고, 전이 구조적 변경 제거 이후 p99 재측정에서
+> 초과가 확인될 때만 재검토한다.
 
 ---
 
