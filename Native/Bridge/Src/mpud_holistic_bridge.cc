@@ -107,6 +107,27 @@ static int copy_normalized_list(
     return count;
 }
 
+// 월드 좌표(미터) 복사. 정규화와 같은 인덱스를 유지하도록 정규화 카운트로 클램프.
+static int copy_world_list(
+    const mediapipe::tasks::components::containers::Landmarks& src,
+    MpudNormalizedLandmark* dst,
+    int capacity,
+    int count_cap)
+{
+    int count = (int)src.landmarks.size();
+    if (count > capacity) count = capacity;
+    if (count > count_cap) count = count_cap;
+    for (int i = 0; i < count; ++i) {
+        const auto& lm = src.landmarks[i];
+        dst[i].x = lm.x;
+        dst[i].y = lm.y;
+        dst[i].z = lm.z;
+        dst[i].visibility = lm.visibility.value_or(0.0f);
+        dst[i].presence = 0.0f;
+    }
+    return count;
+}
+
 MPUD_EXPORT int mpud_submit_holistic_frame(
     MpudHolisticTracker* tracker,
     const MpudImageFrame* frame)
@@ -171,6 +192,12 @@ MPUD_EXPORT int mpud_submit_holistic_frame(
         holistic.left_hand_landmarks, out->left_hand_landmarks, MPUD_HOLISTIC_HAND_LANDMARKS);
     out->right_hand_landmark_count = copy_normalized_list(
         holistic.right_hand_landmarks, out->right_hand_landmarks, MPUD_HOLISTIC_HAND_LANDMARKS);
+    copy_world_list(holistic.pose_world_landmarks, out->pose_world_landmarks,
+        MPUD_HOLISTIC_POSE_LANDMARKS, out->pose_landmark_count);
+    copy_world_list(holistic.left_hand_world_landmarks, out->left_hand_world_landmarks,
+        MPUD_HOLISTIC_HAND_LANDMARKS, out->left_hand_landmark_count);
+    copy_world_list(holistic.right_hand_world_landmarks, out->right_hand_world_landmarks,
+        MPUD_HOLISTIC_HAND_LANDMARKS, out->right_hand_landmark_count);
 
     tracker->has_result = true;
     return MPUD_OK;

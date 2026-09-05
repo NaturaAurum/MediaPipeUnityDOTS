@@ -168,6 +168,21 @@ MPUD_EXPORT int mpud_submit_pose_frame(
             pose->landmarks[i].visibility = lm.visibility.value_or(0.0f);
             pose->landmarks[i].presence = lm.presence.value_or(0.0f);
         }
+
+        if (p < (int)pose_result.pose_world_landmarks.size()) {
+            const auto& world_list = pose_result.pose_world_landmarks[p];
+            int world_count = (int)world_list.landmarks.size();
+            if (world_count > MPUD_POSE_LANDMARKS) world_count = MPUD_POSE_LANDMARKS;
+            if (world_count > pose->landmark_count) world_count = pose->landmark_count;
+            for (int i = 0; i < world_count; ++i) {
+                const auto& wlm = world_list.landmarks[i];
+                pose->world_landmarks[i].x = wlm.x;
+                pose->world_landmarks[i].y = wlm.y;
+                pose->world_landmarks[i].z = wlm.z;
+                pose->world_landmarks[i].visibility = wlm.visibility.value_or(0.0f);
+                pose->world_landmarks[i].presence = 0.0f;
+            }
+        }
     }
     // pose_count=0이면 사람 미감지. timestamp_us는 유효 → C#에서 "최신 프레임이지만 사람 없음" 판별 가능.
 

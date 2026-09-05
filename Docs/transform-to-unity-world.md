@@ -7,7 +7,9 @@ MediaPipe 정규화 랜드마크를 Unity world 좌표로 옮기는 모듈의 �
 
 - 목표: Hand/Face/Pose/Holistic이 공유하는 정규화→world 변환 함수 1개. 배경 Quad 픽셀과 일치시킨다.
 - 범위 내: 정규화 랜드마크(`x`, `y` ∈ [0, 1], `z`는 이미지 너비 기준 정규화 깊이)의 Unity 매핑.
-- 범위 외: Tasks world 랜드마크(미터 단위, pose는 고관절 중심 원점). 브리지가 노출하지 않으므로(`Mpud*Result`는 정규화 리스트만 복사) 별도 단계로 둔다.
+- 월드 랜드마크 (구현됨): Hand/Pose/Holistic이 월드 좌표(미터, pose는 고관절 중심 원점)를 같은 결과 구조체에 함께 싣는다.
+  `WorldLandmarkElement`/`PoseWorldLandmarkElement` 버퍼로 ECS까지 전달되며 정규화와 같은 인덱스를 공유한다.
+  Face는 Tasks 출력에 월드 좌표가 없어 제외. 배경 Quad 매핑(정규화 전용)과는 별개이며 렌더 경로는 미정.
 
 ## 2. 입력 보장
 

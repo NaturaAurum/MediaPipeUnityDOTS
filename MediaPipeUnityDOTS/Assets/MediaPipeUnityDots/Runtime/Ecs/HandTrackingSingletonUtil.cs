@@ -16,6 +16,7 @@ namespace MediaPipeUnityDots.Runtime.Ecs
                     var entity = entityManager.CreateEntity();
                     entityManager.AddComponentData(entity, CreateEmptyStatus(0L, 0L));
                     entityManager.AddBuffer<LandmarkElement>(entity);
+                    entityManager.AddBuffer<WorldLandmarkElement>(entity);
                     return entity;
                 }
 
@@ -25,6 +26,11 @@ namespace MediaPipeUnityDots.Runtime.Ecs
                     if (!entityManager.HasBuffer<LandmarkElement>(entity))
                     {
                         entityManager.AddBuffer<LandmarkElement>(entity);
+                    }
+
+                    if (!entityManager.HasBuffer<WorldLandmarkElement>(entity))
+                    {
+                        entityManager.AddBuffer<WorldLandmarkElement>(entity);
                     }
 
                     return entity;

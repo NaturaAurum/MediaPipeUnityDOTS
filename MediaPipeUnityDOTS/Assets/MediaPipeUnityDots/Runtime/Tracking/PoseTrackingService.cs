@@ -159,6 +159,15 @@ namespace MediaPipeUnityDots.Runtime.Tracking
         }
 
         /// <summary>
+        /// 지정 포즈의 최신 월드 landmark(미터)를 caller-owned destination에 복사한다.
+        /// </summary>
+        public int CopyLatestPoseWorldLandmarksTo(int pose, MpudNormalizedLandmark[] destination)
+        {
+            ThrowIfDisposed();
+            return _snapshot.CopyPoseWorldLandmarksTo(pose, destination);
+        }
+
+        /// <summary>
         /// tracker를 destroy + recreate한다.
         /// snapshot, timestampGen, flipBuffer를 모두 초기화한다.
         /// </summary>

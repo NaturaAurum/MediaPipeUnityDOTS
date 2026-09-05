@@ -56,6 +56,8 @@ typedef struct MpudHand {
     int handedness;     // 0 = Left, 1 = Right
     float score;
     MpudNormalizedLandmark landmarks[MPUD_LANDMARKS_PER_HAND];
+    // 월드 좌표(미터). landmarks와 같은 인덱스, 같은 landmark_count 공유.
+    MpudNormalizedLandmark world_landmarks[MPUD_LANDMARKS_PER_HAND];
 } MpudHand;
 typedef struct MpudHandResult {
     int hand_count;
@@ -64,8 +66,8 @@ typedef struct MpudHandResult {
 } MpudHandResult;
 
 // ABI 고정: C# MpudHandResult와 바이트 일치해야 함. 깨지면 양쪽 static assert가 잡는다.
-_Static_assert(sizeof(MpudHand) == 432, "MpudHand layout changed");
-_Static_assert(sizeof(MpudHandResult) == 1744, "MpudHandResult layout changed");
+_Static_assert(sizeof(MpudHand) == 852, "MpudHand layout changed");
+_Static_assert(sizeof(MpudHandResult) == 3424, "MpudHandResult layout changed");
 
 // --- Config ---
 typedef struct MpudHandTrackerConfig {

@@ -16,6 +16,8 @@ extern "C" {
 typedef struct MpudPose {
     int landmark_count;
     MpudNormalizedLandmark landmarks[MPUD_POSE_LANDMARKS];
+    // 월드 좌표(미터). landmarks와 같은 인덱스, 같은 landmark_count 공유.
+    MpudNormalizedLandmark world_landmarks[MPUD_POSE_LANDMARKS];
 } MpudPose;
 
 typedef struct MpudPoseResult {
@@ -25,8 +27,8 @@ typedef struct MpudPoseResult {
 } MpudPoseResult;
 
 // ABI 고정: C# MpudPoseResult와 바이트 일치해야 함. 깨지면 양쪽 static assert가 잡는다.
-_Static_assert(sizeof(MpudPose) == 664, "MpudPose layout changed");
-_Static_assert(sizeof(MpudPoseResult) == 1344, "MpudPoseResult layout changed");
+_Static_assert(sizeof(MpudPose) == 1324, "MpudPose layout changed");
+_Static_assert(sizeof(MpudPoseResult) == 2664, "MpudPoseResult layout changed");
 
 // --- Config ---
 typedef struct MpudPoseTrackerConfig {

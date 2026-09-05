@@ -14,6 +14,9 @@ namespace MediaPipeUnityDots.Runtime.Tracking
         private readonly MpudNormalizedLandmark[] _poseLandmarks;
         private readonly MpudNormalizedLandmark[] _leftHandLandmarks;
         private readonly MpudNormalizedLandmark[] _rightHandLandmarks;
+        private readonly MpudNormalizedLandmark[] _poseWorldLandmarks;
+        private readonly MpudNormalizedLandmark[] _leftHandWorldLandmarks;
+        private readonly MpudNormalizedLandmark[] _rightHandWorldLandmarks;
 
         public HolisticTrackingSnapshot()
         {
@@ -21,6 +24,9 @@ namespace MediaPipeUnityDots.Runtime.Tracking
             _poseLandmarks = new MpudNormalizedLandmark[MpudHolisticResult.PoseLandmarks];
             _leftHandLandmarks = new MpudNormalizedLandmark[MpudHolisticResult.HandLandmarks];
             _rightHandLandmarks = new MpudNormalizedLandmark[MpudHolisticResult.HandLandmarks];
+            _poseWorldLandmarks = new MpudNormalizedLandmark[MpudHolisticResult.PoseLandmarks];
+            _leftHandWorldLandmarks = new MpudNormalizedLandmark[MpudHolisticResult.HandLandmarks];
+            _rightHandWorldLandmarks = new MpudNormalizedLandmark[MpudHolisticResult.HandLandmarks];
             ResetToEmpty();
         }
 
@@ -63,6 +69,11 @@ namespace MediaPipeUnityDots.Runtime.Tracking
             {
                 _poseLandmarks[i] = nativeResult.GetPoseLandmark(i);
             }
+            Array.Clear(_poseWorldLandmarks, 0, _poseWorldLandmarks.Length);
+            for (var i = 0; i < PoseLandmarkCount; i++)
+            {
+                _poseWorldLandmarks[i] = nativeResult.GetPoseWorldLandmark(i);
+            }
 
             LeftHandLandmarkCount = ClampCount(nativeResult.leftHandLandmarkCount, MpudHolisticResult.HandLandmarks);
             Array.Clear(_leftHandLandmarks, 0, _leftHandLandmarks.Length);
@@ -70,12 +81,22 @@ namespace MediaPipeUnityDots.Runtime.Tracking
             {
                 _leftHandLandmarks[i] = nativeResult.GetLeftHandLandmark(i);
             }
+            Array.Clear(_leftHandWorldLandmarks, 0, _leftHandWorldLandmarks.Length);
+            for (var i = 0; i < LeftHandLandmarkCount; i++)
+            {
+                _leftHandWorldLandmarks[i] = nativeResult.GetLeftHandWorldLandmark(i);
+            }
 
             RightHandLandmarkCount = ClampCount(nativeResult.rightHandLandmarkCount, MpudHolisticResult.HandLandmarks);
             Array.Clear(_rightHandLandmarks, 0, _rightHandLandmarks.Length);
             for (var i = 0; i < RightHandLandmarkCount; i++)
             {
                 _rightHandLandmarks[i] = nativeResult.GetRightHandLandmark(i);
+            }
+            Array.Clear(_rightHandWorldLandmarks, 0, _rightHandWorldLandmarks.Length);
+            for (var i = 0; i < RightHandLandmarkCount; i++)
+            {
+                _rightHandWorldLandmarks[i] = nativeResult.GetRightHandWorldLandmark(i);
             }
         }
 
@@ -109,6 +130,21 @@ namespace MediaPipeUnityDots.Runtime.Tracking
             return CopyOut(_rightHandLandmarks, RightHandLandmarkCount, destination);
         }
 
+        public int CopyPoseWorldTo(MpudNormalizedLandmark[] destination)
+        {
+            return CopyOut(_poseWorldLandmarks, PoseLandmarkCount, destination);
+        }
+
+        public int CopyLeftHandWorldTo(MpudNormalizedLandmark[] destination)
+        {
+            return CopyOut(_leftHandWorldLandmarks, LeftHandLandmarkCount, destination);
+        }
+
+        public int CopyRightHandWorldTo(MpudNormalizedLandmark[] destination)
+        {
+            return CopyOut(_rightHandWorldLandmarks, RightHandLandmarkCount, destination);
+        }
+
         /// <summary>
         /// reset/recreate 직후 empty state로 초기화한다.
         /// </summary>
@@ -118,6 +154,9 @@ namespace MediaPipeUnityDots.Runtime.Tracking
             Array.Clear(_poseLandmarks, 0, _poseLandmarks.Length);
             Array.Clear(_leftHandLandmarks, 0, _leftHandLandmarks.Length);
             Array.Clear(_rightHandLandmarks, 0, _rightHandLandmarks.Length);
+            Array.Clear(_poseWorldLandmarks, 0, _poseWorldLandmarks.Length);
+            Array.Clear(_leftHandWorldLandmarks, 0, _leftHandWorldLandmarks.Length);
+            Array.Clear(_rightHandWorldLandmarks, 0, _rightHandWorldLandmarks.Length);
 
             FaceLandmarkCount = 0;
             PoseLandmarkCount = 0;
