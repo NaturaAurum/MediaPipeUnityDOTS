@@ -24,6 +24,8 @@ namespace MediaPipeUnityDots.Sample.HandTracking.Scripts
         private float _minPresenceConfidence = 0.5f;
         [SerializeField]
         private int _logIntervalFrames = 60;
+        [SerializeField]
+        private bool _verboseLogging;
 
         private HolisticTrackingService _service;
         private MpudNormalizedLandmark[] _faceCopyBuffer;
@@ -87,7 +89,7 @@ namespace MediaPipeUnityDots.Sample.HandTracking.Scripts
             }
 
             _submitCount++;
-            if (_logIntervalFrames > 0 && _submitCount % _logIntervalFrames == 0)
+            if (_verboseLogging && _logIntervalFrames > 0 && _submitCount % _logIntervalFrames == 0)
             {
                 Debug.Log(
                     $"[MPUD] Holistic frame #{_service.LatestFrameCount} | Valid={_service.LatestIsValid} | Face={_service.LatestFaceLandmarkCount} Pose={_service.LatestPoseLandmarkCount} L={_service.LatestLeftHandLandmarkCount} R={_service.LatestRightHandLandmarkCount} | ts={_service.LatestTimestampUs}");
@@ -191,7 +193,10 @@ namespace MediaPipeUnityDots.Sample.HandTracking.Scripts
                     });
 
                 var landmarks = entityManager.GetBuffer<FaceLandmarkElement>(_faceSingleton);
-                landmarks.ResizeUninitialized(count);
+                if (landmarks.Length != count)
+                {
+                    landmarks.ResizeUninitialized(count);
+                }
                 for (var i = 0; i < count; i++)
                 {
                     var source = _faceCopyBuffer[i];
@@ -228,7 +233,10 @@ namespace MediaPipeUnityDots.Sample.HandTracking.Scripts
                     });
 
                 var landmarks = entityManager.GetBuffer<PoseLandmarkElement>(_poseSingleton);
-                landmarks.ResizeUninitialized(count);
+                if (landmarks.Length != count)
+                {
+                    landmarks.ResizeUninitialized(count);
+                }
                 for (var i = 0; i < count; i++)
                 {
                     var source = _poseCopyBuffer[i];
@@ -277,7 +285,10 @@ namespace MediaPipeUnityDots.Sample.HandTracking.Scripts
             status.ScoreList.Clear();
 
             var landmarks = entityManager.GetBuffer<LandmarkElement>(_handSingleton);
-            landmarks.ResizeUninitialized(handCount * 21);
+            if (landmarks.Length != handCount * 21)
+            {
+                landmarks.ResizeUninitialized(handCount * 21);
+            }
 
             var slot = 0;
             if (leftCount > 0)

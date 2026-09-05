@@ -21,6 +21,8 @@ namespace MediaPipeUnityDots.Sample.HandTracking.Scripts
         [SerializeField]
         private int _logIntervalFrames = 60;
         [SerializeField]
+        private bool _verboseLogging;
+        [SerializeField]
         private int _numFaces = 1;
         [SerializeField]
         private float _minDetectionConfidence = 0.5f;
@@ -110,7 +112,7 @@ namespace MediaPipeUnityDots.Sample.HandTracking.Scripts
 
             _submitCount++;
 
-            if (_logIntervalFrames > 0 && _submitCount % _logIntervalFrames == 0)
+            if (_verboseLogging && _logIntervalFrames > 0 && _submitCount % _logIntervalFrames == 0)
             {
                 Debug.Log(
                     $"[MPUD] Face frame #{_service.LatestFrameCount} | Valid={_service.LatestIsValid} | Faces={_service.LatestFaceCount} | Landmarks={_service.LatestLandmarkCount} | ts={_service.LatestTimestampUs}");
@@ -211,7 +213,10 @@ namespace MediaPipeUnityDots.Sample.HandTracking.Scripts
                 });
 
             var landmarks = entityManager.GetBuffer<FaceLandmarkElement>(_singletonEntity);
-            landmarks.ResizeUninitialized(faceCount * LandmarkCapacity);
+            if (landmarks.Length != faceCount * LandmarkCapacity)
+            {
+                landmarks.ResizeUninitialized(faceCount * LandmarkCapacity);
+            }
 
             for (var f = 0; f < faceCount; f++)
             {
