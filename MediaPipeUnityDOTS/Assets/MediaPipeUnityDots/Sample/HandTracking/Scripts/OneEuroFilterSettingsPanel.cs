@@ -25,6 +25,7 @@ namespace MediaPipeUnityDots.Sample.HandTracking.Scripts
         private VisualElement _panelElement;
         private Toggle _enabledToggle;
         private Toggle _verboseLoggingToggle;
+        private Toggle _renderModeToggle;
         private Slider _handMinCutoff;
         private Slider _handBeta;
         private Slider _faceMinCutoff;
@@ -90,6 +91,7 @@ namespace MediaPipeUnityDots.Sample.HandTracking.Scripts
 
             _enabledToggle = _panelElement.Q<Toggle>("filter-enabled-toggle");
             _verboseLoggingToggle = _panelElement.Q<Toggle>("verbose-logging-toggle");
+            _renderModeToggle = _panelElement.Q<Toggle>("render-mode-toggle");
             _handMinCutoff = _panelElement.Q<Slider>("hand-min-cutoff");
             _handBeta = _panelElement.Q<Slider>("hand-beta");
             _faceMinCutoff = _panelElement.Q<Slider>("face-min-cutoff");
@@ -108,6 +110,11 @@ namespace MediaPipeUnityDots.Sample.HandTracking.Scripts
             if (_verboseLoggingToggle != null)
             {
                 _verboseLoggingToggle.RegisterValueChangedCallback(OnVerboseLoggingChanged);
+            }
+
+            if (_renderModeToggle != null)
+            {
+                _renderModeToggle.RegisterValueChangedCallback(OnRenderModeChanged);
             }
 
             if (_handMinCutoff != null)
@@ -158,6 +165,12 @@ namespace MediaPipeUnityDots.Sample.HandTracking.Scripts
             {
                 _verboseLoggingToggle.UnregisterValueChangedCallback(OnVerboseLoggingChanged);
                 _verboseLoggingToggle = null;
+            }
+
+            if (_renderModeToggle != null)
+            {
+                _renderModeToggle.UnregisterValueChangedCallback(OnRenderModeChanged);
+                _renderModeToggle = null;
             }
 
             if (_handMinCutoff != null)
@@ -222,6 +235,12 @@ namespace MediaPipeUnityDots.Sample.HandTracking.Scripts
             MpudLog.Log($"[MPUD] Verbose logging: {(evt.newValue ? "on" : "off")}");
         }
 
+        private void OnRenderModeChanged(ChangeEvent<bool> evt)
+        {
+            _settings.RenderMode = evt.newValue ? 1 : 0;
+            PushSettingsToEcs();
+        }
+
         private void OnHandMinCutoffChanged(ChangeEvent<float> evt)
         {
             _settings.HandMinCutoff = evt.newValue;
@@ -269,6 +288,7 @@ namespace MediaPipeUnityDots.Sample.HandTracking.Scripts
         {
             _enabledToggle?.SetValueWithoutNotify(_settings.Enabled != 0);
             _verboseLoggingToggle?.SetValueWithoutNotify(MpudLog.Enabled);
+            _renderModeToggle?.SetValueWithoutNotify(_settings.RenderMode != 0);
             _handMinCutoff?.SetValueWithoutNotify(_settings.HandMinCutoff);
             _handBeta?.SetValueWithoutNotify(_settings.HandBeta);
             _faceMinCutoff?.SetValueWithoutNotify(_settings.FaceMinCutoff);

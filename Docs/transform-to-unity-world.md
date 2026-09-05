@@ -30,6 +30,8 @@ world = Origin + (u - 0.5) * AxisX + (v - 0.5) * AxisY - Forward * 0.05
 - 리더는 반전 없이 직접 인덱싱한다. flip=false면 y가 배열 분율 그대로, flip=true면 뒤집힌 배열에서 읽으므로 위와 같이 복원한다.
 - 비디오가 없으면 `IsValid = 0`을 발행하고 포인트를 숨긴다.
 - ECS 시스템은 `SimulationSystemGroup`, 발행은 `LateUpdate`이므로 최대 1프레임 지연이 있다.
+- 렌더 모드: `RenderMode` 0 = 2D 오버레이(정규화), 1 = 3D 월드(미터, 쿼드 프레임에 직결, 스케일 잠정).
+  Face는 월드 출력이 없어 2D 폴백. 모드 전환 시 필터 상태가 리셋된다.
 
 ## 4. 참조: MediaPipeUnityPlugin
 

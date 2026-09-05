@@ -21,6 +21,7 @@ namespace MediaPipeUnityDots.Tests.EditMode
         private Slider _handBeta;
         private Button _resetButton;
         private Toggle _verboseLoggingToggle;
+        private Toggle _renderModeToggle;
 
         [SetUp]
         public void SetUp()
@@ -36,12 +37,14 @@ namespace MediaPipeUnityDots.Tests.EditMode
             _handBeta = new Slider { name = "hand-beta", lowValue = 0.001f, highValue = 0.05f, value = 0.007f };
             _resetButton = new Button { name = "reset-defaults-button" };
             _verboseLoggingToggle = new Toggle { name = "verbose-logging-toggle" };
+            _renderModeToggle = new Toggle { name = "render-mode-toggle" };
 
             _panelElement.Add(_toggle);
             _panelElement.Add(_handMinCutoff);
             _panelElement.Add(_handBeta);
             _panelElement.Add(_resetButton);
             _panelElement.Add(_verboseLoggingToggle);
+            _panelElement.Add(_renderModeToggle);
             _root.Add(_panelElement);
         }
 
@@ -116,6 +119,15 @@ namespace MediaPipeUnityDots.Tests.EditMode
 
             Assert.AreEqual(pushesBeforeReset + 1, _panel.PushCount);
             Assert.AreEqual(1.0f, _handMinCutoff.value, 1e-5f);
+        }
+
+        [Test]
+        public void RenderModeToggle_TriggersSinglePush()
+        {
+            _panel.BindToRoot(_root);
+            var pushes = _panel.PushCount;
+            _renderModeToggle.value = true;
+            Assert.AreEqual(pushes + 1, _panel.PushCount);
         }
 
         [Test]

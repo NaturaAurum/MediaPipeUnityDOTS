@@ -14,6 +14,7 @@ namespace MediaPipeUnityDots.Runtime.Ecs
         public float3 PrevDerivative;
         public long LastTimestampUs;
         public int Initialized;
+        public int Mode;
     }
 
     /// <summary>

@@ -7,7 +7,7 @@ namespace MediaPipeUnityDots.Runtime.Ecs
 {
     /// <summary>
     /// 싱글턴 상태+버퍼를 읽어 얼굴 포인트 엔티티의 LocalTransform을 기록한다.
-    /// 배경 Quad 정합 매핑(LandmarkOverlayMapping)을 공유하고 OneEuroFilterSettings 설정을 반영한다.
+    /// Face는 Tasks 월드 출력이 없어 2D 폴백. 월드 추가 시 Hand/Pose와 같은 분기로 확장.
     /// 필터는 입력 타임스탬프가 바뀔 때만 전진하므로 렌더 FPS와 무관하다.
     /// 무효 상태나 버퍼 부족 인덱스는 필터 상태를 리셋하고 스케일 0으로 숨긴다.
     /// </summary>
@@ -36,6 +36,7 @@ namespace MediaPipeUnityDots.Runtime.Ecs
                 : OneEuroFilterSettings.Default;
 
             var inputTimestampUs = status.TimestampUs;
+            var renderMode = filterSettings.RenderMode;
             var minCutoff = new float3(filterSettings.FaceMinCutoff, filterSettings.FaceMinCutoff, filterSettings.ZMinCutoff);
             var beta = new float3(filterSettings.FaceBeta, filterSettings.FaceBeta, filterSettings.ZBeta);
 
@@ -50,6 +51,12 @@ namespace MediaPipeUnityDots.Runtime.Ecs
                     && bufferIndex >= 0 && bufferIndex < landmarks.Length
                     && landmarks[bufferIndex].FaceIndex == face)
                 {
+                    if (filter.ValueRW.Mode != renderMode)
+                    {
+                        filter.ValueRW.Initialized = 0;
+                        filter.ValueRW.Mode = renderMode;
+                    }
+
                     var element = landmarks[bufferIndex];
                     var filtered = OneEuroFilter.Filter(
                         new float3(element.X, element.Y, element.Z),
