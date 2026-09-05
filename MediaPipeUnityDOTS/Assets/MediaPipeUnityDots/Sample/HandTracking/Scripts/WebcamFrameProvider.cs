@@ -25,6 +25,8 @@ namespace MediaPipeUnityDots.Sample.HandTracking.Scripts
         private int _numHands = 2;
         [SerializeField]
         private int _logIntervalFrames = 60;
+        [SerializeField]
+        private bool _verboseLogging;
 
         /// <summary>
         /// 추적할 손 수. HandTrackingService와 포인트 스포너가 공유한다.
@@ -368,9 +370,9 @@ namespace MediaPipeUnityDots.Sample.HandTracking.Scripts
 
         private bool ShouldLogSubmit()
         {
-            if (_logIntervalFrames <= 0)
+            if (!_verboseLogging || _logIntervalFrames <= 0)
             {
-                return true;
+                return false;
             }
 
             return _submitCount % _logIntervalFrames == 0;

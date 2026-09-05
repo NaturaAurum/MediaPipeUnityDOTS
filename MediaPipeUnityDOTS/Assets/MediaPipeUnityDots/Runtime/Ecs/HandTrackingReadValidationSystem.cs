@@ -6,8 +6,6 @@ namespace MediaPipeUnityDots.Runtime.Ecs
     [WorldSystemFilter(WorldSystemFilterFlags.Default | WorldSystemFilterFlags.Editor)]
     public partial struct HandTrackingReadValidationSystem : ISystem
     {
-        private const int LogIntervalFrames = 60;
-
         private long _lastLoggedTimestampUs;
         private long _lastLoggedFrameCount;
         private bool _hasLoggedState;
@@ -96,7 +94,7 @@ namespace MediaPipeUnityDots.Runtime.Ecs
                 return true;
             }
 
-            return LogIntervalFrames > 0 && status.FrameCount % LogIntervalFrames == 0;
+            return false;
         }
     }
 }

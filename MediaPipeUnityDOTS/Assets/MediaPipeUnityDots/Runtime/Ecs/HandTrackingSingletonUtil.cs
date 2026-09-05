@@ -41,13 +41,11 @@ namespace MediaPipeUnityDots.Runtime.Ecs
         public static void WriteInvalidPolledState(EntityManager entityManager, Entity entity, long timestampUs, long frameCount)
         {
             entityManager.SetComponentData(entity, CreateEmptyStatus(timestampUs, frameCount));
-            entityManager.GetBuffer<LandmarkElement>(entity).Clear();
         }
 
         public static void WriteResetEmptyState(EntityManager entityManager, Entity entity)
         {
             entityManager.SetComponentData(entity, CreateEmptyStatus(0L, 0L));
-            entityManager.GetBuffer<LandmarkElement>(entity).Clear();
         }
 
         private static HandTrackingStatus CreateEmptyStatus(long timestampUs, long frameCount)
