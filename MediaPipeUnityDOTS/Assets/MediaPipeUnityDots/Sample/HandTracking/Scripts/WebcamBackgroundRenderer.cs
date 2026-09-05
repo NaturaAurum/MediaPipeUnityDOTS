@@ -46,7 +46,7 @@ namespace MediaPipeUnityDots.Sample.HandTracking.Scripts
         {
             if (_provider == null || _camera == null || _quadFilter == null || _quadRenderer == null)
             {
-                Debug.LogError("[MPUD] Webcam background references are not wired in the scene.");
+                MpudLog.Error("[MPUD] Webcam background references are not wired in the scene.");
                 enabled = false;
                 return;
             }
@@ -54,7 +54,7 @@ namespace MediaPipeUnityDots.Sample.HandTracking.Scripts
             var quadMesh = Resources.GetBuiltinResource<Mesh>(QuadMeshName);
             if (quadMesh == null)
             {
-                Debug.LogError("[MPUD] Built-in Quad mesh was not found.");
+                MpudLog.Error("[MPUD] Built-in Quad mesh was not found.");
                 enabled = false;
                 return;
             }

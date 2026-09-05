@@ -71,7 +71,7 @@ namespace MediaPipeUnityDots.Sample.HandTracking.Scripts
             }
             catch (Exception exception)
             {
-                Debug.LogError($"[MPUD] Failed to initialize webcam provider: {exception}");
+                MpudLog.Error($"[MPUD] Failed to initialize webcam provider: {exception}");
                 DisposeResources();
                 enabled = false;
             }
@@ -116,7 +116,7 @@ namespace MediaPipeUnityDots.Sample.HandTracking.Scripts
             LatestFlipVertically = flipVertically;
             if (!_hasLoggedRuntimeMetadata)
             {
-                Debug.Log(
+                MpudLog.Log(
                     $"[MPUD] Webcam ready: {width}x{height} | mirrored={_webCamTexture.videoVerticallyMirrored} | rotation={_webCamTexture.videoRotationAngle} | flipVerticalSubmit={flipVertically}");
                 _hasLoggedRuntimeMetadata = true;
             }
@@ -132,7 +132,7 @@ namespace MediaPipeUnityDots.Sample.HandTracking.Scripts
             _submitCount++;
             if (ShouldLogSubmit())
             {
-                Debug.Log($"[MPUD] Submit #{_submitCount}, ts={_service.LatestTimestampUs}");
+                MpudLog.Log($"[MPUD] Submit #{_submitCount}, ts={_service.LatestTimestampUs}");
             }
 
             if (ShouldLogFrameSummary())
@@ -142,7 +142,7 @@ namespace MediaPipeUnityDots.Sample.HandTracking.Scripts
                 _lastLoggedFrameHandedness = _service.LatestHandedness;
                 _lastLoggedFrameLandmarkCount = _service.LatestLandmarkCount;
 
-                Debug.Log(
+                MpudLog.Log(
                     $"[MPUD] Frame #{_service.LatestFrameCount} | Valid={_service.LatestIsValid} | Hands={_service.LatestHandCount} | Handedness={_service.LatestHandedness} | Score={_service.LatestScore:F2} | Landmarks={_service.LatestLandmarkCount} | ts={_service.LatestTimestampUs}");
             }
 
@@ -209,7 +209,7 @@ namespace MediaPipeUnityDots.Sample.HandTracking.Scripts
 
             TryGetEntityManager(out _);
 
-            Debug.Log($"[MPUD] Webcam provider started with device '{devices[0].name}'.");
+            MpudLog.Log($"[MPUD] Webcam provider started with device '{devices[0].name}'.");
         }
 
         private void DisposeResources()
@@ -369,7 +369,7 @@ namespace MediaPipeUnityDots.Sample.HandTracking.Scripts
 
         private bool ShouldLogSubmit()
         {
-            if (!MpudLogService.Enabled || _logIntervalFrames <= 0)
+            if (!MpudLog.Enabled || _logIntervalFrames <= 0)
             {
                 return false;
             }

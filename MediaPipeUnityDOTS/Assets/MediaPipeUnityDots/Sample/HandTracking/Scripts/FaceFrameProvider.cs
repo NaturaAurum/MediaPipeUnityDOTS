@@ -52,7 +52,7 @@ namespace MediaPipeUnityDots.Sample.HandTracking.Scripts
 
             if (_webcamSource == null)
             {
-                Debug.LogError("[MPUD] FaceFrameProvider needs WebcamFrameProvider.");
+                MpudLog.Error("[MPUD] FaceFrameProvider needs WebcamFrameProvider.");
                 enabled = false;
                 return;
             }
@@ -63,7 +63,7 @@ namespace MediaPipeUnityDots.Sample.HandTracking.Scripts
             }
             catch (Exception exception)
             {
-                Debug.LogError($"[MPUD] Failed to initialize face provider: {exception}");
+                MpudLog.Error($"[MPUD] Failed to initialize face provider: {exception}");
                 DisposeResources();
                 enabled = false;
             }
@@ -98,7 +98,7 @@ namespace MediaPipeUnityDots.Sample.HandTracking.Scripts
 
             if (!_service.LatestIsValid)
             {
-                Debug.LogWarning($"[MPUD][DIAG] face invalid | hash={hash} sameAsPrev={hash == _prevHash} latencyMs={latencyMs:F1}");
+                MpudLog.Warning($"[MPUD][DIAG] face invalid | hash={hash} sameAsPrev={hash == _prevHash} latencyMs={latencyMs:F1}");
                 // TEMP 진단: 무효 프레임 영상 3장 저장. 원인 확정 후 삭제.
                 if (_invalidDumpCount < 3)
                 {
@@ -111,9 +111,9 @@ namespace MediaPipeUnityDots.Sample.HandTracking.Scripts
 
             _submitCount++;
 
-            if (MpudLogService.Enabled && _logIntervalFrames > 0 && _submitCount % _logIntervalFrames == 0)
+            if (MpudLog.Enabled && _logIntervalFrames > 0 && _submitCount % _logIntervalFrames == 0)
             {
-                Debug.Log(
+                MpudLog.Log(
                     $"[MPUD] Face frame #{_service.LatestFrameCount} | Valid={_service.LatestIsValid} | Faces={_service.LatestFaceCount} | Landmarks={_service.LatestLandmarkCount} | ts={_service.LatestTimestampUs}");
             }
 
@@ -164,7 +164,7 @@ namespace MediaPipeUnityDots.Sample.HandTracking.Scripts
 
             TryGetEntityManager(out _);
 
-            Debug.Log("[MPUD] Face provider started.");
+            MpudLog.Log("[MPUD] Face provider started.");
         }
 
         private void DisposeResources()
@@ -267,11 +267,11 @@ namespace MediaPipeUnityDots.Sample.HandTracking.Scripts
                     $"face_invalid_{System.DateTime.Now:HHmmss_fff}.png");
                 System.IO.File.WriteAllBytes(path, tex.EncodeToPNG());
                 UnityEngine.Object.Destroy(tex);
-                Debug.LogWarning($"[MPUD][DIAG] dumped {path}");
+                MpudLog.Warning($"[MPUD][DIAG] dumped {path}");
             }
             catch (System.Exception exception)
             {
-                Debug.LogWarning($"[MPUD][DIAG] dump failed: {exception.Message}");
+                MpudLog.Warning($"[MPUD][DIAG] dump failed: {exception.Message}");
             }
         }
 

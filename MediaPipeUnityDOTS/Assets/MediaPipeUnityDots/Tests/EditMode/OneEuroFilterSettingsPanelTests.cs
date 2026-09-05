@@ -124,9 +124,9 @@ namespace MediaPipeUnityDots.Tests.EditMode
         {
             _panel.BindToRoot(_root);
             _verboseLoggingToggle.value = true;
-            Assert.IsTrue(MpudLogService.Enabled);
+            Assert.IsTrue(MpudLog.Enabled);
             _verboseLoggingToggle.value = false;
-            Assert.IsFalse(MpudLogService.Enabled);
+            Assert.IsFalse(MpudLog.Enabled);
         }
     }
 }

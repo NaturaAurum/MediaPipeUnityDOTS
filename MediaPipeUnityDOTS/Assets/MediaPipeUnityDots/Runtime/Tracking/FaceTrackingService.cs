@@ -72,7 +72,7 @@ namespace MediaPipeUnityDots.Runtime.Tracking
 
             if (!IsCreated)
             {
-                Debug.LogError("[MPUD] face submit skipped because tracker is not created.");
+                MpudLog.Error("[MPUD] face submit skipped because tracker is not created.");
                 return;
             }
 
@@ -118,7 +118,7 @@ namespace MediaPipeUnityDots.Runtime.Tracking
                 var submitStatus = MpudFaceBridge.mpud_submit_face_frame(_trackerHandle, ref frame);
                 if (submitStatus != MpudStatus.Ok)
                 {
-                    Debug.LogError($"[MPUD] submit_face_frame failed ({submitStatus}): {MpudFaceBridge.GetLastFaceError()}");
+                    MpudLog.Error($"[MPUD] submit_face_frame failed ({submitStatus}): {MpudFaceBridge.GetLastFaceError()}");
                     return;
                 }
             }
@@ -139,11 +139,11 @@ namespace MediaPipeUnityDots.Runtime.Tracking
 
             if (pollStatus == MpudStatus.NoResult)
             {
-                Debug.LogWarning("[MPUD] try_get_latest_face_result returned MPUD_NO_RESULT immediately after a successful submit.");
+                MpudLog.Warning("[MPUD] try_get_latest_face_result returned MPUD_NO_RESULT immediately after a successful submit.");
                 return;
             }
 
-            Debug.LogError($"[MPUD] try_get_latest_face_result failed ({pollStatus}): {MpudFaceBridge.GetLastFaceError()}");
+            MpudLog.Error($"[MPUD] try_get_latest_face_result failed ({pollStatus}): {MpudFaceBridge.GetLastFaceError()}");
         }
 
         /// <summary>

@@ -32,7 +32,7 @@ namespace MediaPipeUnityDots.Runtime.Ecs
                 singletonCount++;
                 if (singletonCount > 1)
                 {
-                    Debug.LogError("[MPUD ECS] HandTrackingReadValidationSystem found multiple HandTrackingStatus entities.");
+                    MpudLog.Error("[MPUD ECS] HandTrackingReadValidationSystem found multiple HandTrackingStatus entities.");
                     return;
                 }
 
@@ -47,7 +47,7 @@ namespace MediaPipeUnityDots.Runtime.Ecs
 
             if (!SystemAPI.HasBuffer<LandmarkElement>(singletonEntity))
             {
-                Debug.LogError("[MPUD ECS] HandTrackingReadValidationSystem could not find LandmarkElement buffer.");
+                MpudLog.Error("[MPUD ECS] HandTrackingReadValidationSystem could not find LandmarkElement buffer.");
                 return;
             }
 
@@ -74,7 +74,7 @@ namespace MediaPipeUnityDots.Runtime.Ecs
             _lastReportedHandCount = status.HandCount;
             _lastReportedBufferLength = landmarks.Length;
 
-            Debug.Log(
+            MpudLog.Log(
                 $"[MPUD ECS] Frame #{status.FrameCount} | Valid={status.IsValid} | Hands={status.HandCount} | Handedness={status.Handedness} | Score={status.Score:F2} | Landmarks={status.LandmarkCount} | BufferLength={landmarks.Length} | ts={status.TimestampUs}");
         }
 

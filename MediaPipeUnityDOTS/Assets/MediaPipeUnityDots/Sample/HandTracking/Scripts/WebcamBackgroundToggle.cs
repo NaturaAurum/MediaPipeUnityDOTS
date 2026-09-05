@@ -22,7 +22,7 @@ namespace MediaPipeUnityDots.Sample.HandTracking.Scripts
         {
             if (_renderer == null || _panelRenderer == null)
             {
-                Debug.LogError("[MPUD] WebcamBackgroundToggle references are not wired in the scene.");
+                MpudLog.Error("[MPUD] WebcamBackgroundToggle references are not wired in the scene.");
                 enabled = false;
                 return;
             }
@@ -55,7 +55,7 @@ namespace MediaPipeUnityDots.Sample.HandTracking.Scripts
             _toggle = root.Q<Toggle>(ToggleElementName);
             if (_toggle == null)
             {
-                Debug.LogError("[MPUD] webcam-toggle element was not found in WebcamToggle.uxml.");
+                MpudLog.Error("[MPUD] webcam-toggle element was not found in WebcamToggle.uxml.");
                 return;
             }
 
@@ -75,7 +75,7 @@ namespace MediaPipeUnityDots.Sample.HandTracking.Scripts
 
         private void OnToggleChanged(ChangeEvent<bool> evt)
         {
-            Debug.Log($"[MPUD] Webcam background visible: {evt.newValue}");
+            MpudLog.Log($"[MPUD] Webcam background visible: {evt.newValue}");
             if (_renderer != null)
             {
                 _renderer.SetVisible(evt.newValue);

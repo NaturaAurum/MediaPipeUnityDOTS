@@ -40,7 +40,7 @@ namespace MediaPipeUnityDots.Sample.HandTracking.Scripts
         {
             if (_panelRenderer == null)
             {
-                Debug.LogError("[MPUD] OneEuroFilterSettingsPanel: _panelRenderer is not wired.");
+                MpudLog.Error("[MPUD] OneEuroFilterSettingsPanel: _panelRenderer is not wired.");
                 enabled = false;
                 return;
             }
@@ -219,8 +219,8 @@ namespace MediaPipeUnityDots.Sample.HandTracking.Scripts
 
         private void OnVerboseLoggingChanged(ChangeEvent<bool> evt)
         {
-            MpudLogService.Enabled = evt.newValue;
-            Debug.Log($"[MPUD] Verbose logging: {(evt.newValue ? "on" : "off")}");
+            MpudLog.Enabled = evt.newValue;
+            MpudLog.Log($"[MPUD] Verbose logging: {(evt.newValue ? "on" : "off")}");
         }
 
         private void OnHandMinCutoffChanged(ChangeEvent<float> evt)
@@ -269,7 +269,7 @@ namespace MediaPipeUnityDots.Sample.HandTracking.Scripts
         private void SyncUiFromSettings()
         {
             _enabledToggle?.SetValueWithoutNotify(_settings.Enabled != 0);
-            _verboseLoggingToggle?.SetValueWithoutNotify(MpudLogService.Enabled);
+            _verboseLoggingToggle?.SetValueWithoutNotify(MpudLog.Enabled);
             _handMinCutoff?.SetValueWithoutNotify(_settings.HandMinCutoff);
             _handBeta?.SetValueWithoutNotify(_settings.HandBeta);
             _faceMinCutoff?.SetValueWithoutNotify(_settings.FaceMinCutoff);
@@ -292,12 +292,12 @@ namespace MediaPipeUnityDots.Sample.HandTracking.Scripts
             if (TryGetSettingsEntity(out var entityManager, out var entity))
             {
                 var echoed = entityManager.GetComponentData<OneEuroFilterSettings>(entity);
-                Debug.Log($"[MPUD] OneEuroFilter {reason}: pushed Enabled={_settings.Enabled}, " +
+                MpudLog.Log($"[MPUD] OneEuroFilter {reason}: pushed Enabled={_settings.Enabled}, " +
                     $"ecs Enabled={echoed.Enabled}, HandMinCutoff={echoed.HandMinCutoff}");
             }
             else
             {
-                Debug.LogWarning("[MPUD] OneEuroFilter push skipped: no ECS world.");
+                MpudLog.Warning("[MPUD] OneEuroFilter push skipped: no ECS world.");
             }
         }
 
