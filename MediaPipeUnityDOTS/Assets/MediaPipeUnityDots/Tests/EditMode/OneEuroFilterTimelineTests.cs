@@ -76,5 +76,21 @@ namespace MediaPipeUnityDots.Tests.EditMode
             Assert.AreEqual(5f, afterReset.x, 1e-6f);
             Assert.AreEqual(0L, state.LastTimestampUs);
         }
+
+        [Test]
+        public void FilterSettings_DefaultValues_AreValidAndNonZero()
+        {
+            var def = OneEuroFilterSettings.Default;
+            Assert.AreEqual(1, def.Enabled);
+            Assert.Greater(def.HandMinCutoff, 0f);
+            Assert.Greater(def.HandBeta, 0f);
+            Assert.Greater(def.FaceMinCutoff, 0f);
+            Assert.Greater(def.FaceBeta, 0f);
+            Assert.Greater(def.PoseMinCutoff, 0f);
+            Assert.Greater(def.PoseBeta, 0f);
+            Assert.Greater(def.ZMinCutoff, 0f);
+            Assert.Greater(def.ZBeta, 0f);
+            Assert.Greater(def.DerivativeCutoffHz, 0f);
+        }
     }
 }
