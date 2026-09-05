@@ -1,4 +1,5 @@
 using MediaPipeUnityDots.Runtime.Ecs;
+using MediaPipeUnityDots.Runtime.Logging;
 using Unity.Entities;
 using UnityEngine;
 using UnityEngine.UIElements;
@@ -24,6 +25,7 @@ namespace MediaPipeUnityDots.Sample.HandTracking.Scripts
 
         private VisualElement _panelElement;
         private Toggle _enabledToggle;
+        private Toggle _verboseLoggingToggle;
         private Slider _handMinCutoff;
         private Slider _handBeta;
         private Slider _faceMinCutoff;
@@ -88,6 +90,7 @@ namespace MediaPipeUnityDots.Sample.HandTracking.Scripts
             }
 
             _enabledToggle = _panelElement.Q<Toggle>("filter-enabled-toggle");
+            _verboseLoggingToggle = _panelElement.Q<Toggle>("verbose-logging-toggle");
             _handMinCutoff = _panelElement.Q<Slider>("hand-min-cutoff");
             _handBeta = _panelElement.Q<Slider>("hand-beta");
             _faceMinCutoff = _panelElement.Q<Slider>("face-min-cutoff");
@@ -101,6 +104,11 @@ namespace MediaPipeUnityDots.Sample.HandTracking.Scripts
             if (_enabledToggle != null)
             {
                 _enabledToggle.RegisterValueChangedCallback(OnEnabledToggleChanged);
+            }
+
+            if (_verboseLoggingToggle != null)
+            {
+                _verboseLoggingToggle.RegisterValueChangedCallback(OnVerboseLoggingChanged);
             }
 
             if (_handMinCutoff != null)
@@ -145,6 +153,12 @@ namespace MediaPipeUnityDots.Sample.HandTracking.Scripts
             {
                 _enabledToggle.UnregisterValueChangedCallback(OnEnabledToggleChanged);
                 _enabledToggle = null;
+            }
+
+            if (_verboseLoggingToggle != null)
+            {
+                _verboseLoggingToggle.UnregisterValueChangedCallback(OnVerboseLoggingChanged);
+                _verboseLoggingToggle = null;
             }
 
             if (_handMinCutoff != null)
@@ -203,6 +217,12 @@ namespace MediaPipeUnityDots.Sample.HandTracking.Scripts
             LogEcsReadback("toggle");
         }
 
+        private void OnVerboseLoggingChanged(ChangeEvent<bool> evt)
+        {
+            MpudLogService.Enabled = evt.newValue;
+            Debug.Log($"[MPUD] Verbose logging: {(evt.newValue ? "on" : "off")}");
+        }
+
         private void OnHandMinCutoffChanged(ChangeEvent<float> evt)
         {
             _settings.HandMinCutoff = evt.newValue;
@@ -249,6 +269,7 @@ namespace MediaPipeUnityDots.Sample.HandTracking.Scripts
         private void SyncUiFromSettings()
         {
             _enabledToggle?.SetValueWithoutNotify(_settings.Enabled != 0);
+            _verboseLoggingToggle?.SetValueWithoutNotify(MpudLogService.Enabled);
             _handMinCutoff?.SetValueWithoutNotify(_settings.HandMinCutoff);
             _handBeta?.SetValueWithoutNotify(_settings.HandBeta);
             _faceMinCutoff?.SetValueWithoutNotify(_settings.FaceMinCutoff);

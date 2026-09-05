@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using MediaPipeUnityDots.Runtime.Ecs;
+using MediaPipeUnityDots.Runtime.Logging;
 using MediaPipeUnityDots.Runtime.Interop;
 using MediaPipeUnityDots.Runtime.Tracking;
 using Unity.Entities;
@@ -26,8 +27,6 @@ namespace MediaPipeUnityDots.Sample.HandTracking.Scripts
         private float _minTrackingConfidence = 0.5f;
         [SerializeField]
         private int _logIntervalFrames = 60;
-        [SerializeField]
-        private bool _verboseLogging;
 
         /// <summary>
         /// 추적할 포즈 수. PoseTrackingService와 포인트 스포너가 공유한다.
@@ -91,7 +90,7 @@ namespace MediaPipeUnityDots.Sample.HandTracking.Scripts
             }
 
             _submitCount++;
-            if (_verboseLogging && _logIntervalFrames > 0 && _submitCount % _logIntervalFrames == 0)
+            if (MpudLogService.Enabled && _logIntervalFrames > 0 && _submitCount % _logIntervalFrames == 0)
             {
                 Debug.Log(
                     $"[MPUD] Pose frame #{_service.LatestFrameCount} | Valid={_service.LatestIsValid} | Poses={_service.LatestPoseCount} | Landmarks={_service.LatestLandmarkCount} | ts={_service.LatestTimestampUs}");
