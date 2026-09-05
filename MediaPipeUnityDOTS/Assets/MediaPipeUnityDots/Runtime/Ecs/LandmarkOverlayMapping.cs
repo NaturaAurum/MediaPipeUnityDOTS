@@ -36,5 +36,25 @@ namespace MediaPipeUnityDots.Runtime.Ecs
                 + (v - 0.5f) * mapping.AxisY
                 - mapping.Forward * OverlayEpsilon;
         }
+
+        /// <summary>
+        /// 월드 랜드마크(미터)를 Unity 좌표로 옮긴다.
+        /// 기준점 상대 오프셋만 쓰므로 월드 원점 규약(고관절 중심 등)에 무관하다.
+        /// z부호가 뒤집혀 보이면 Forward 항만 뒤집으면 된다.
+        /// </summary>
+        public static float3 MapWorld(
+            float3 world,
+            float3 worldCenter,
+            float3 anchorPos,
+            float3 right,
+            float3 up,
+            float3 forward,
+            float scale)
+        {
+            return anchorPos
+                + right * ((world.x - worldCenter.x) * scale)
+                + up * ((world.y - worldCenter.y) * scale)
+                + forward * ((world.z - worldCenter.z) * scale - OverlayEpsilon);
+        }
     }
 }

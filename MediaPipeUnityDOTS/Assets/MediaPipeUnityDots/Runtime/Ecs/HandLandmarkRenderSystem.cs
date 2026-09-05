@@ -7,7 +7,7 @@ namespace MediaPipeUnityDots.Runtime.Ecs
 {
     /// <summary>
     /// 싱글턴 상태+버퍼를 읽어 21개 포인트 엔티티의 LocalTransform을 기록한다.
-    /// 2D(정규화 오버레이)/3D(월드 미터)를 RenderMode로 전환한다.
+    /// 2D(정규화 오버레이)/3D(월드 미터, 손목 앵커)를 RenderMode로 전환한다.
     /// 필터는 입력 타임스탬프가 바뀔 때만 전진하므로 렌더 FPS와 무관하다.
     /// 무효 상태나 버퍼 부족 인덱스는 필터 상태를 리셋하고 스케일 0으로 숨긴다.
     /// </summary>
@@ -17,6 +17,7 @@ namespace MediaPipeUnityDots.Runtime.Ecs
     {
         private const float PointScale = 0.05f;
         private const int MaxLandmarksPerHand = 21;
+        private const int WristIndex = 0;
         private const float WorldScale = 4f;
 
         public void OnCreate(ref SystemState state)
@@ -61,9 +62,14 @@ namespace MediaPipeUnityDots.Runtime.Ecs
                         filter.ValueRW.Mode = renderMode;
                     }
 
+                    var wristIndex = hand * MaxLandmarksPerHand + WristIndex;
                     float3 targetPos;
                     if (renderMode != 0 && bufferIndex < worldLandmarks.Length
-                        && worldLandmarks[bufferIndex].HandIndex == hand)
+                        && worldLandmarks[bufferIndex].HandIndex == hand
+                        && wristIndex >= 0 && wristIndex < landmarks.Length
+                        && wristIndex < worldLandmarks.Length
+                        && landmarks[wristIndex].HandIndex == hand
+                        && worldLandmarks[wristIndex].HandIndex == hand)
                     {
                         var w = worldLandmarks[bufferIndex];
                         var filtered = OneEuroFilter.Filter(
@@ -74,12 +80,13 @@ namespace MediaPipeUnityDots.Runtime.Ecs
                             beta,
                             filterSettings.DerivativeCutoffHz,
                             inputTimestampUs);
-                        // ponytail: 임시 3D 배치. 월드 미터를 쿼드 프레임에 직결.
-                        // 스케일/원점/z부호 캘리브레이션은 후속.
-                        targetPos = mapping.Origin
-                            + worldRight * (filtered.x * WorldScale)
-                            + worldUp * (filtered.y * WorldScale)
-                            + mapping.Forward * (filtered.z * WorldScale - 0.05f);
+                        // 앵커는 원시 손목 좌표(필터 상태는 포인트별 소유라 공유 불가).
+                        var anchor = LandmarkOverlayMapping.Map(
+                            landmarks[wristIndex].X, landmarks[wristIndex].Y, in mapping);
+                        var wristWorld = worldLandmarks[wristIndex];
+                        var center = new float3(wristWorld.X, wristWorld.Y, wristWorld.Z);
+                        targetPos = LandmarkOverlayMapping.MapWorld(
+                            filtered, center, anchor, worldRight, worldUp, mapping.Forward, WorldScale);
                     }
                     else
                     {
