@@ -21,13 +21,11 @@ MediaPipe 정규화 랜드마크를 Unity world 좌표로 옮기는 모듈의 �
 
 ```text
 u = (x - UvOffsetX) / UvScaleX
-v = ((Flipped ? y : 1 - y) - UvOffsetY) / UvScaleY
+v = ((Flipped ? 1 - y : y) - UvOffsetY) / UvScaleY
 world = Origin + (u - 0.5) * AxisX + (v - 0.5) * AxisY - Forward * 0.05
 ```
 
-- `(x, y)`는 submit 이미지 기준 정규화 좌표다. 표시 이미지와 submit 이미지는 모두 정립 상태로 보정되므로 같은 픽셀을 가리킨다.
-- `Origin/AxisX/AxisY/Forward`는 Quad transform에서 온다. Quad는 카메라 frustum fit이므로 카메라가 움직여도 정합이 유지된다.
-- 포인트는 Quad 앞 0.05에 둬 z-fighting을 피한다. landmark z는 쓰지 않는다 (평면 오버레이).
+- 리더는 반전 없이 직접 인덱싱한다. flip=false면 y가 배열 분율 그대로, flip=true면 뒤집힌 배열에서 읽으므로 위와 같이 복원한다.
 - 비디오가 없으면 `IsValid = 0`을 발행하고 포인트를 숨긴다.
 - ECS 시스템은 `SimulationSystemGroup`, 발행은 `LateUpdate`이므로 최대 1프레임 지연이 있다.
 
@@ -69,5 +67,5 @@ world = Origin + (u - 0.5) * AxisX + (v - 0.5) * AxisY - Forward * 0.05
 
 ## 7. 검증 기준
 
-- 수식 단위 검증: 무크롭/미러 없음에서 `(0,0) → (u=0,v=1)` 좌상단, `(1,1) → (u=1,v=0)` 우하단. flip on/off가 같은 코너에 mapping되는지 4케이스로 확인 (통과).
+- 수식 단위 검증: 원시 배열 분율 마커(jx=0.3, j=0.2)를 flip 양쪽·크롭 3종에 제출→Map→배경 샘플링 round-trip으로 복원 확인 (6/6 통과).
 - Editor 확인 필요: 실프레임에서 포인트가 배경 영상 특징 위에 올라오는지. Unity 컴파일은 이 환경에서 불가하므로 Editor 실행 체크가 남았다.

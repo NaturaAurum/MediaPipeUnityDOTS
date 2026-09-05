@@ -26,7 +26,10 @@ namespace MediaPipeUnityDots.Runtime.Ecs
         public static float3 Map(float x, float y, in LandmarkOverlayMapping mapping)
         {
             var u = (x - mapping.UvOffsetX) / mapping.UvScaleX;
-            var textureV = (mapping.Flipped != 0 ? y : 1f - y) - mapping.UvOffsetY;
+            // 리더는 반전 없이 직접 인덱싱한다(row r = array[r]).
+            // flip=false면 y가 배열 분율 그대로(y=j), flip=true면 뒤집힌 배열에서 읽으므로(y=1-j).
+            // 배경 샘플링(vt → array fraction vt)을 역연산하면 아래 식이 된다.
+            var textureV = (mapping.Flipped != 0 ? 1f - y : y) - mapping.UvOffsetY;
             var v = textureV / mapping.UvScaleY;
             return mapping.Origin
                 + (u - 0.5f) * mapping.AxisX
