@@ -10,7 +10,7 @@ namespace MediaPipeUnityDots.Runtime.Ecs
     {
         public int Enabled;
 
-        // 0 = 2D overlay (정규화), 1 = 3D world (미터). Face는 월드 미지원이라 2D 폴백.
+        // 0 = 2D 오버레이, 1 = 영상 XY + 월드 Z의 3D 정합. 미터 형상 복원이 아니며 Face는 2D 폴백.
         public int RenderMode;
 
         // Hand

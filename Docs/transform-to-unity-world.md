@@ -1,76 +1,79 @@
 # Landmark → Unity World 좌표 변환
 
-MediaPipe 정규화 랜드마크를 Unity world 좌표로 옮기는 모듈의 설계 문서다.
-배경 WebcamTexture 픽셀과의 정합을 우선 목표로 한다.
+## 원본 데이터와 표시 좌표
 
-## 1. 목표와 범위
+`WorldLandmarkElement`와 `PoseWorldLandmarkElement`는 **MediaPipe 월드 랜드마크 원본(미터)**이다.
+Unity 씬 좌표가 아니다. 브리지와 프로바이더는 XYZ를 그대로 복사하며, 외부 소비자가 가공할 수 있도록 원본 버퍼를 유지한다.
+정규화 버퍼와 같은 대상·포인트 인덱스를 사용한다. Hand/Pose 및 Holistic의 해당 부위에 적용되며 Face에는 월드 출력이 없다.
 
-- 목표: Hand/Face/Pose/Holistic이 공유하는 정규화→world 변환 함수 1개. 배경 Quad 픽셀과 일치시킨다.
-- 범위 내: 정규화 랜드마크(`x`, `y` ∈ [0, 1], `z`는 이미지 너비 기준 정규화 깊이)의 Unity 매핑.
-- 월드 랜드마크 (구현됨): Hand/Pose/Holistic이 월드 좌표(미터, pose는 고관절 중심 원점)를 같은 결과 구조체에 함께 싣는다.
-  `WorldLandmarkElement`/`PoseWorldLandmarkElement` 버퍼로 ECS까지 전달되며 정규화와 같은 인덱스를 공유한다.
-  Face는 Tasks 출력에 월드 좌표가 없어 제외. 배경 Quad 매핑(정규화 전용)과는 별개이며 렌더 경로는 미정.
+렌더링은 **영상 픽셀 정합**을 우선한다. XY는 정규화 영상 좌표, 깊이는 월드 Z에서 얻는다.
+이는 원래 미터 단위 3D 형상을 보존하는 변환도, 카메라에서 대상까지의 절대 거리를 복원하는 방법도 아니다.
 
-## 2. 입력 보장
+## 1. 배경 매핑과 카메라 투영
 
-- `WebcamFrameProvider`는 `videoVerticallyMirrored`일 때만 `FlipVertical` 후 submit한다. MediaPipe는 항상 정립(upright) 이미지를 본다고 가정한다.
-- `videoRotationAngle`은 사용하지 않는다. 세로(portrait) 웹캠은 미지원이다 (`WebcamBackgroundRenderer`의 ponytail 주석과 동일 가정).
-- 좌우 미러 보정은 없다. 전면 카메라 프리뷰 미러링은 UV에서만 처리된다.
+`WebcamBackgroundRenderer`가 Quad와 UV 크롭·반전을 소유하고 `LandmarkOverlayMapping`에 다음 값을 발행한다.
 
-## 3. 배경 정합 매핑 (구현됨)
+- Quad 중심 `Origin`, 전체 너비·높이 벡터 `AxisX`, `AxisY`, 카메라 전방 `Forward`
+- UV scale/offset, 제출 이미지의 `Flipped`
+- `CameraPosition`, `NearClipPlane`, `IsPerspective`
 
-`WebcamBackgroundRenderer`가 UV 크롭식을 단일 소유하고, 매 `LateUpdate`마다 `LandmarkOverlayMapping` singleton에 기록한다. Hand/Face/Pose 3개 RenderSystem은 `LandmarkOverlayMapping.Map`을 공유 호출한다. 이전 고정 rect 매직 상수(`WorldWidth = 2`, `WorldHeight = 1.5`)는 삭제됐다.
+정규화 좌표를 배경 평면의 위치로 바꾸는 식은 다음과 같다.
 
 ```text
 u = (x - UvOffsetX) / UvScaleX
 v = ((Flipped ? 1 - y : y) - UvOffsetY) / UvScaleY
-world = Origin + (u - 0.5) * AxisX + (v - 0.5) * AxisY - Forward * 0.05
+plane = Origin + (u - 0.5) * AxisX + (v - 0.5) * AxisY
 ```
 
-- 리더는 반전 없이 직접 인덱싱한다. flip=false면 y가 배열 분율 그대로, flip=true면 뒤집힌 배열에서 읽으므로 위와 같이 복원한다.
-- 비디오가 없으면 `IsValid = 0`을 발행하고 포인트를 숨긴다.
-- ECS 시스템은 `SimulationSystemGroup`, 발행은 `LateUpdate`이므로 최대 1프레임 지연이 있다.
-- 렌더 모드: `RenderMode` 0 = 2D 오버레이(정규화), 1 = 3D 월드(`MapWorld`).
-  3D는 추적 대상 기준점(손목/고관절 중점)을 정규화 매핑으로 영상 위에 고정하고 월드 상대 오프셋을 미터 스케일로 펼친다.
-  기준점 상대라 월드 원점 규약에 무관하다. Face는 월드 출력이 없어 2D 폴백. 모드 전환 시 필터 상태가 리셋된다.
+기존 제출 이미지/UV 반전 규약을 유지한다. `videoVerticallyMirrored`일 때 제출 배열을 뒤집는다.
+`videoRotationAngle`을 이용한 90°/270° 보정은 아직 지원하지 않는다.
 
-## 4. 참조: MediaPipeUnityPlugin
+`MapWithDepth(x, y, depth, mapping)`은 평면 위치를 **같은 화면 픽셀에 투영되는 위치**로 이동한다.
 
-`homuler/MediaPipeUnityPlugin`, `Runtime/Scripts/Unity/CoordinateSystem/` 기준이다.
+```text
+planeDepth = dot(plane - CameraPosition, Forward)
+offset = depth - 0.05
+// 근접 클리핑을 넘지 않도록 offset 하한을 적용한다.
+원근: position = CameraPosition + (plane - CameraPosition) * (1 + offset / planeDepth)
+직교: position = plane + Forward * offset
+```
 
-- 정규화→로컬 핵심식 (`ImageCoordinate.ImageNormalizedToLocalPoint`):
-  - 회전 90°/270°이면 `(nx, ny)`를 맞바꾼다.
-  - x는 `Lerp(xMin, xMax, nx)`, y는 `Lerp(yMax, yMin, ny)`가 기본이다. 즉 y 뒤집기는 기본 동작이다.
-  - z는 `zScale * nz`이며, `zScale` 미지정 시 rect 너비를 쓴다 ("Z usually uses roughly the same scale as X").
-- 회전/미러 반전 테이블 (`ImageCoordinate`/`RealWorldCoordinate` 공통):
+단순히 전방 벡터로만 이동하면 원근 카메라에서 화면 XY가 밀린다. 원근 모드에서는 카메라 광선 위에서 이동하여 이를 막는다.
+`Map(x, y, mapping)`은 깊이 0인 같은 함수를 사용한다. 따라서 2D와 3D 모두 동일한 픽셀 정합과 한 번의 전방 여유 거리(0.05)를 적용한다.
 
-| 조건 | X 반전 | Y 반전 | 축 교환 |
-|------|--------|--------|---------|
-| Rotation0, 미러 없음 | 없음 | 있음 | 없음 |
-| Rotation90, 미러 없음 | 있음 | 있음 | 있음 |
-| Rotation180, 미러 없음 | 있음 | 없음 | 없음 |
-| Rotation270, 미러 없음 | 없음 | 없음 | 있음 |
-| Rotation0, 미러 있음 | 있음 | 있음 | 없음 |
+## 2. 표시용 깊이
 
-- 실월드 랜드마크 (`RealWorldCoordinate.RealWorldToLocalPoint`): 미터값을 `scale`로 곱하고, pose는 `_hipHeightMeter`(기본 0.9m)만큼 원점을 들어 올린다 (`PoseWorldLandmarkListAnnotationController`, `_scale` 기본 100).
+Hand/Pose 렌더 시스템은 각 대상의 유효한 정규화·월드 쌍을 한 번 순회해 범위를 집계한다.
+관리 배열이나 임시 NativeArray는 만들지 않으며, 대상별 최종 값은 스택의 `FixedList128Bytes<float2>`에 보관한다.
 
-우리 식과의 차이 2가지:
+```text
+imageSize = (정규화 X 범위 * |AxisX| / UvScaleX,
+             정규화 Y 범위 * |AxisY| / UvScaleY)
+scale = length(imageSize) / length(월드 XY 범위)
+relativeZ = worldZ - 대상의 최대 worldZ
+표시 깊이 = filteredRelativeZ * scale
+```
 
-1. y 뒤집기는 일치한다. `Flipped ? y : 1 - y`는 반전 테이블의 Rotation0 행과 같다.
-2. z 부호가 다르다. 참조는 `+zScale * nz` 유지, 우리는 Quad 평면 앞에 고정 배치한다. 참조의 포인트는 화면 공간 Rect 위에 직접 그리므로 z는 깊이 힌트에 가깝고, 우리는 엔티티를 배경 앞 3D 공간에 두므로 평면으로 고정했다.
+- 고정 배율(손 ×4, 포즈 ×1)을 제거했다. 영상상의 대상 크기·Quad 크기·크롭에 따라 깊이 배율이 달라진다.
+- 월드 XY 범위가 퇴화하면 깊이 배율은 0이다. 단안 추론 결과로 배율을 정할 수 없을 때 깊이를 임의로 증폭하지 않는다.
+- 최대 Z를 기준으로 빼므로 모든 점이 배경 앞에 배치된다. 작은 Z가 더 카메라 쪽이며, 불투명 배경에 점이 가려지는 것을 방지한다.
+- 월드 원점을 일괄 이동해도 표시 결과는 변하지 않는다. 손목/고관절 원점 가정은 필요 없다.
+- 월드 데이터가 없는 포인트는 2D로 폴백한다. Face도 2D를 유지한다.
 
-## 5. 구현 위치
+## 3. 필터와 시간
 
-- `Runtime/Ecs/LandmarkOverlayMapping.cs`: singleton 컴포넌트 + Burst 호환 `Map`.
-- `Sample/HandTracking/Scripts/WebcamBackgroundRenderer.cs`: `PublishOverlayMapping`/`TryGetMappingEntity`. Sample→ECS push이며 씬 배선 추가는 없다.
-- `Runtime/Ecs/Hand|Face|PoseLandmarkRenderSystem.cs`: `Map` 호출로 교체. Holistic 렌더 시스템은 아직 없어 적용 대상이 아니다.
+필터 입력은 `(정규화 X, 정규화 Y, 상대 월드 Z)`이다. 필터링한 월드 좌표에서 원시 손목을 빼던 혼합 경로는 제거했다.
+입력 `TimestampUs`가 바뀔 때만 필터를 전진시키며, 2D/3D 전환 및 월드 데이터 유실·복귀 시 상태를 리셋한다.
+필터를 켜면 XY는 평활화된 영상 좌표에 정합되므로 움직이는 원본 영상에 대한 필터 지연은 남는다.
 
-## 6. 미결정 사항
+매핑 발행은 `LateUpdate`, 렌더 시스템은 `SimulationSystemGroup`이다. 현재 구조에서 매핑 갱신에는 최대 한 프레임 지연이 있다.
+원본 픽셀과 추론 결과의 시간 차이, 추론 오차, 깊이 배율의 프레임별 변화까지 제거하는 시간 동기화·카메라 보정 기능은 아니다.
 
-- z 스케일: 평면 고정 유지 vs landmark z 반영.
-- Holistic 렌더 포인트 수: Face 478 + Pose 33 + 양손 21×2 = 574개를 전부 스폰할 것인가.
+## 4. 구현과 검증
 
-## 7. 검증 기준
+- `Runtime/Ecs/Common/LandmarkOverlayMapping.cs`: 매핑 데이터, `Map`, `MapWithDepth`, 깊이 배율과 범위 집계.
+- `Runtime/Ecs/Hand/HandLandmarkRenderSystem.cs`, `Runtime/Ecs/Pose/PoseLandmarkRenderSystem.cs`: 영상 XY + 상대 월드 Z 표시.
+- `Sample/HandTracking/Scripts/WebcamBackgroundRenderer.cs`: Quad 배치와 카메라·UV 매핑 발행. 직교 카메라는 `orthographicSize`를 사용한다.
+- `Tests/EditMode/LandmarkOverlayMappingTests.cs`: 원근/직교, 카메라 이동·회전, UV 크롭·반전, 깊이·근접 클리핑, 배율·퇴화 범위 회귀 검사.
 
-- 수식 단위 검증: 원시 배열 분율 마커(jx=0.3, j=0.2)를 flip 양쪽·크롭 3종에 제출→Map→배경 샘플링 round-trip으로 복원 확인 (6/6 통과).
-- Editor 확인 필요: 실프레임에서 포인트가 배경 영상 특징 위에 올라오는지. Unity 컴파일은 이 환경에서 불가하므로 Editor 실행 체크가 남았다.
+시각적 결과는 미터 형상이 아닌 영상 정합용 3D 표현이다. 물리 연산이나 별도 3D 아바타에는 표시 좌표 대신 원본 월드 버퍼를 사용한다.
