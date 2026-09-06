@@ -11,7 +11,7 @@ namespace MediaPipeUnityDots.Runtime.Tracking
     /// <summary>
     /// WebCamTexture로부터 프레임을 캡처하고 HandTrackingService에 제출하는 런타임 프로바이더.
     /// </summary>
-    public class WebcamFrameProvider : MonoBehaviour
+    public class WebcamFrameProvider : MonoBehaviour, IPointSource
     {
         private const int LandmarkCapacity = 21;
 
@@ -30,6 +30,7 @@ namespace MediaPipeUnityDots.Runtime.Tracking
         /// 추적할 손 수. HandTrackingService와 포인트 스포너가 공유한다.
         /// </summary>
         public int NumHands => Mathf.Clamp(_numHands, 1, MpudHandResult.MaxHands);
+        int IPointSource.MaxTargets => NumHands;
 
         /// <summary>
         /// Update에서 읽은 최신 raw 픽셀. 얼굴 등 다른 트래커와 웹캠을 공유한다.
@@ -328,7 +329,7 @@ namespace MediaPipeUnityDots.Runtime.Tracking
                 }
             }
 
-            var world = entityManager.GetBuffer<WorldLandmarkElement>(_singletonEntity);
+            var world = entityManager.GetBuffer<HandWorldLandmarkElement>(_singletonEntity);
             if (world.Length != handCount * LandmarkCapacity)
             {
                 world.ResizeUninitialized(handCount * LandmarkCapacity);
@@ -343,7 +344,7 @@ namespace MediaPipeUnityDots.Runtime.Tracking
                     if (i < worldCount)
                     {
                         var source = _landmarkCopyBuffer[i];
-                        world[bufferIndex] = new WorldLandmarkElement
+                        world[bufferIndex] = new HandWorldLandmarkElement
                         {
                             X = source.x,
                             Y = source.y,
@@ -354,7 +355,7 @@ namespace MediaPipeUnityDots.Runtime.Tracking
                     }
                     else
                     {
-                        world[bufferIndex] = new WorldLandmarkElement { HandIndex = -1 };
+                        world[bufferIndex] = new HandWorldLandmarkElement { HandIndex = -1 };
                     }
                 }
             }

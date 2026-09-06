@@ -16,7 +16,7 @@ namespace MediaPipeUnityDots.Runtime.Ecs
                     var entity = entityManager.CreateEntity();
                     entityManager.AddComponentData(entity, CreateEmptyStatus(0L, 0L));
                     entityManager.AddBuffer<LandmarkElement>(entity);
-                    entityManager.AddBuffer<WorldLandmarkElement>(entity);
+                    entityManager.AddBuffer<HandWorldLandmarkElement>(entity);
                     return entity;
                 }
 
@@ -28,9 +28,9 @@ namespace MediaPipeUnityDots.Runtime.Ecs
                         entityManager.AddBuffer<LandmarkElement>(entity);
                     }
 
-                    if (!entityManager.HasBuffer<WorldLandmarkElement>(entity))
+                    if (!entityManager.HasBuffer<HandWorldLandmarkElement>(entity))
                     {
-                        entityManager.AddBuffer<WorldLandmarkElement>(entity);
+                        entityManager.AddBuffer<HandWorldLandmarkElement>(entity);
                     }
 
                     return entity;

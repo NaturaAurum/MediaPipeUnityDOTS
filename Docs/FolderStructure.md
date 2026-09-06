@@ -117,7 +117,8 @@ MediaPipeUnityDOTS/
 
 - 승격됨: `Webcam/Face/Pose/HolisticFrameProvider`, `HandTrackingAdapter`,
   `HandTrackingDto` → `Tracking/Hand|Face|Pose|Holistic` (+공유 웹캠은 `Tracking` 루트).
-  `Face/Hand/PoseLandmarkPointSpawner` → `Ecs/Hand|Face|Pose` (Entities Graphics 의존 포함).
+  표시층은 `Ecs/Common`으로 통일: `LandmarkPointSpawner`·`LandmarkRenderSystem`·`LandmarkRender`
+  (`LandmarkPoint`/`LandmarkTracker`/`IPointSource`). 트래커별 포인트 태그·스포너·렌더 3종은 삭제.
 - 잔류: `OneEuroFilterSettingsPanel`, `HandTrackingStatusPanel`
   (App 레이어 UI), `WebcamBackgroundRenderer`, `WebcamBackgroundToggle`
   (데모 씬 전용), `NativeSmokeTest`(+Editor 러너, 진단용).
