@@ -2,9 +2,10 @@
 
 ## 원본 데이터와 표시 좌표
 
-`WorldLandmarkElement`와 `PoseWorldLandmarkElement`는 **MediaPipe 월드 랜드마크 원본(미터)**이다.
+`HandWorldLandmarkElement`와 `PoseWorldLandmarkElement`는 **MediaPipe 월드 랜드마크 원본(미터)**이다.
 Unity 씬 좌표가 아니다. 브리지와 프로바이더는 XYZ를 그대로 복사하며, 외부 소비자가 가공할 수 있도록 원본 버퍼를 유지한다.
 정규화 버퍼와 같은 대상·포인트 인덱스를 사용한다. Hand/Pose 및 Holistic의 해당 부위에 적용되며 Face에는 월드 출력이 없다.
+Face는 대신 52개 blendshape score를 `FaceBlendshapeElement` 버퍼(얼굴당 52개)로 전달한다.
 
 렌더링은 **영상 픽셀 정합**을 우선한다. XY는 정규화 영상 좌표, 깊이는 월드 Z에서 얻는다.
 이는 원래 미터 단위 3D 형상을 보존하는 변환도, 카메라에서 대상까지의 절대 거리를 복원하는 방법도 아니다.

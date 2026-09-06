@@ -60,6 +60,7 @@ MPUD_EXPORT int mpud_create_face_tracker(
     auto options = std::make_unique<mp_fl::FaceLandmarkerOptions>();
     options->base_options.model_asset_path = config->model_asset_path;
     options->num_faces = num_faces;
+    options->output_face_blendshapes = true;
     options->min_face_detection_confidence = config->min_detection_confidence;
     options->min_face_presence_confidence = config->min_detection_confidence;
     options->min_tracking_confidence = config->min_tracking_confidence;
@@ -159,7 +160,6 @@ MPUD_EXPORT int mpud_submit_face_frame(
         if (face->landmark_count > MPUD_FACE_LANDMARKS) {
             face->landmark_count = MPUD_FACE_LANDMARKS;
         }
-
         for (int i = 0; i < face->landmark_count; ++i) {
             const auto& lm = lm_list.landmarks[i];
             face->landmarks[i].x = lm.x;
@@ -167,6 +167,19 @@ MPUD_EXPORT int mpud_submit_face_frame(
             face->landmarks[i].z = lm.z;
             face->landmarks[i].visibility = lm.visibility.value_or(0.0f);
             face->landmarks[i].presence = lm.presence.value_or(0.0f);
+        }
+
+        // blendshapes는 optional이다. 요청해도 얼굴별로 비어 있을 수 있다.
+        face->blendshape_count = 0;
+        if (face_result.face_blendshapes.has_value() &&
+            f < (int)face_result.face_blendshapes->size()) {
+            const auto& categories = (*face_result.face_blendshapes)[f].categories;
+            int blendshape_count = (int)categories.size();
+            if (blendshape_count > MPUD_FACE_BLENDSHAPES) blendshape_count = MPUD_FACE_BLENDSHAPES;
+            face->blendshape_count = blendshape_count;
+            for (int i = 0; i < blendshape_count; ++i) {
+                face->blendshapes[i] = categories[i].score;
+            }
         }
     }
     // face_count=0이면 얼굴 미감지. timestamp_us는 유효 → C#에서 "최신 프레임이지만 얼굴 없음" 판별 가능.

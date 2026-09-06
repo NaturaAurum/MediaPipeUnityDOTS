@@ -119,13 +119,14 @@ namespace MediaPipeUnityDots.Runtime.Interop
     {
         public const int MaxFaces = 2;
         public const int LandmarksPerFace = 478;
+        public const int BlendshapesPerFace = 52;
 
-        // 얼굴당: landmarkCount(int) + 2390 floats = 2391 floats.
-        // C MpudFaceResult와 바이트 일치(faceCount int + pad + timestamp long + 2×9564).
+        // 얼굴당: landmarkCount(int) + 2390 floats + blendshapeCount(int) + 52 floats = 2444 floats.
+        // C MpudFaceResult와 바이트 일치(faceCount int + pad + timestamp long + 2×9776).
         // 네이티브 헤더의 static assert와 쌍을 이룸. ExpectedSize 불일치는 ABI 드리프트다.
-        public const int ExpectedSize = 19144;
+        public const int ExpectedSize = 19568;
 
-        private const int FloatsPerFace = 2391;
+        private const int FloatsPerFace = 2444;
 
         public int faceCount;
         public long timestampUs;
@@ -157,6 +158,26 @@ namespace MediaPipeUnityDots.Runtime.Interop
                 visibility = faceData[offset + 3],
                 presence = faceData[offset + 4],
             };
+        }
+
+        public int GetFaceBlendshapeCount(int face)
+        {
+            CheckFace(face);
+            fixed (float* data = faceData)
+            {
+                return *(int*)(data + face * FloatsPerFace + 1 + LandmarksPerFace * 5);
+            }
+        }
+
+        public float GetFaceBlendshape(int face, int i)
+        {
+            CheckFace(face);
+            if (i < 0 || i >= GetFaceBlendshapeCount(face))
+            {
+                throw new ArgumentOutOfRangeException(nameof(i));
+            }
+
+            return faceData[face * FloatsPerFace + 1 + LandmarksPerFace * 5 + 1 + i];
         }
 
         private static void CheckFace(int face)
