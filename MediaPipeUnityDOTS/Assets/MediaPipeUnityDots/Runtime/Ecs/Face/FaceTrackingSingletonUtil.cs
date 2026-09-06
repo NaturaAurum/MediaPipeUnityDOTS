@@ -16,6 +16,7 @@ namespace MediaPipeUnityDots.Runtime.Ecs
                     var entity = entityManager.CreateEntity();
                     entityManager.AddComponentData(entity, CreateEmptyStatus(0L, 0L));
                     entityManager.AddBuffer<FaceLandmarkElement>(entity);
+                    entityManager.AddBuffer<FaceBlendshapeElement>(entity);
                     return entity;
                 }
 
@@ -25,6 +26,11 @@ namespace MediaPipeUnityDots.Runtime.Ecs
                     if (!entityManager.HasBuffer<FaceLandmarkElement>(entity))
                     {
                         entityManager.AddBuffer<FaceLandmarkElement>(entity);
+                    }
+
+                    if (!entityManager.HasBuffer<FaceBlendshapeElement>(entity))
+                    {
+                        entityManager.AddBuffer<FaceBlendshapeElement>(entity);
                     }
 
                     return entity;

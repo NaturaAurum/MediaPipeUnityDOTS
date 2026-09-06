@@ -12,10 +12,13 @@ extern "C" {
 //   face_count=0: 얼굴 미감지. timestamp_us만 유효 (프레임 처리 완료 확인용).
 #define MPUD_MAX_FACES 2
 #define MPUD_FACE_LANDMARKS 478
+#define MPUD_FACE_BLENDSHAPES 52
 
 typedef struct MpudFace {
     int landmark_count;
     MpudNormalizedLandmark landmarks[MPUD_FACE_LANDMARKS];
+    int blendshape_count;
+    float blendshapes[MPUD_FACE_BLENDSHAPES];
 } MpudFace;
 
 typedef struct MpudFaceResult {
@@ -25,8 +28,8 @@ typedef struct MpudFaceResult {
 } MpudFaceResult;
 
 // ABI 고정: C# MpudFaceResult와 바이트 일치해야 함. 깨지면 양쪽 static assert가 잡는다.
-_Static_assert(sizeof(MpudFace) == 9564, "MpudFace layout changed");
-_Static_assert(sizeof(MpudFaceResult) == 19144, "MpudFaceResult layout changed");
+_Static_assert(sizeof(MpudFace) == 9776, "MpudFace layout changed");
+_Static_assert(sizeof(MpudFaceResult) == 19568, "MpudFaceResult layout changed");
 
 // --- Config ---
 typedef struct MpudFaceTrackerConfig {

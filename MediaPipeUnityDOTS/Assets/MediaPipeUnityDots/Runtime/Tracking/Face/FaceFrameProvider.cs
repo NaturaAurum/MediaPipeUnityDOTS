@@ -35,6 +35,7 @@ namespace MediaPipeUnityDots.Runtime.Tracking
 
         private FaceTrackingService _service;
         private MpudNormalizedLandmark[] _landmarkCopyBuffer;
+        private float[] _blendshapeCopyBuffer;
         private World _ecsWorld;
         private Entity _singletonEntity;
         private long _submitCount;
@@ -155,8 +156,8 @@ namespace MediaPipeUnityDots.Runtime.Tracking
             {
                 throw new FileNotFoundException("face_landmarker.task was not found.", modelPath);
             }
-            _service = new FaceTrackingService(modelPath, NumFaces, _minDetectionConfidence, _minTrackingConfidence);
             _landmarkCopyBuffer = new MpudNormalizedLandmark[LandmarkCapacity];
+            _blendshapeCopyBuffer = new float[MpudFaceResult.BlendshapesPerFace];
             _ecsWorld = null;
             _singletonEntity = Entity.Null;
             _submitCount = 0;
@@ -176,6 +177,7 @@ namespace MediaPipeUnityDots.Runtime.Tracking
             }
 
             _landmarkCopyBuffer = null;
+            _blendshapeCopyBuffer = null;
             _ecsWorld = null;
             _singletonEntity = Entity.Null;
         }
@@ -237,6 +239,34 @@ namespace MediaPipeUnityDots.Runtime.Tracking
                     else
                     {
                         landmarks[bufferIndex] = new FaceLandmarkElement { FaceIndex = -1 };
+                    }
+                }
+            }
+            var blendshapeCapacity = MpudFaceResult.BlendshapesPerFace;
+            var blendshapes = entityManager.GetBuffer<FaceBlendshapeElement>(_singletonEntity);
+            if (blendshapes.Length != faceCount * blendshapeCapacity)
+            {
+                blendshapes.ResizeUninitialized(faceCount * blendshapeCapacity);
+            }
+
+            for (var f = 0; f < faceCount; f++)
+            {
+                var copiedCount = _service.CopyLatestFaceBlendshapesTo(f, _blendshapeCopyBuffer);
+                for (var i = 0; i < blendshapeCapacity; i++)
+                {
+                    var bufferIndex = f * blendshapeCapacity + i;
+                    if (i < copiedCount)
+                    {
+                        blendshapes[bufferIndex] = new FaceBlendshapeElement
+                        {
+                            Score = _blendshapeCopyBuffer[i],
+                            FaceIndex = f,
+                            BlendshapeIndex = i,
+                        };
+                    }
+                    else
+                    {
+                        blendshapes[bufferIndex] = new FaceBlendshapeElement { FaceIndex = -1 };
                     }
                 }
             }

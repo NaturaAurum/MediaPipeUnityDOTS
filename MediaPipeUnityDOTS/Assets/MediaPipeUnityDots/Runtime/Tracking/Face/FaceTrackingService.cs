@@ -155,6 +155,17 @@ namespace MediaPipeUnityDots.Runtime.Tracking
             return _snapshot.CopyFaceLandmarksTo(face, destination);
         }
 
+        public int LatestBlendshapeCount => _snapshot.FaceCount > 0 ? _snapshot.GetBlendshapeCount(0) : 0;
+
+        /// <summary>
+        /// 지정 얼굴의 최신 blendshape score를 caller-owned destination에 복사한다.
+        /// </summary>
+        public int CopyLatestFaceBlendshapesTo(int face, float[] destination)
+        {
+            ThrowIfDisposed();
+            return _snapshot.CopyFaceBlendshapesTo(face, destination);
+        }
+
         /// <summary>
         /// tracker를 destroy + recreate한다.
         /// snapshot, timestampGen, flipBuffer를 모두 초기화한다.
