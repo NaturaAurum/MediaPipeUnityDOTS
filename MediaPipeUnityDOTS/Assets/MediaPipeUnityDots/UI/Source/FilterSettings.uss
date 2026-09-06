@@ -55,6 +55,7 @@
 
 .setting-slider .unity-slider__input {
     width: 50px;
+    color: #333333;
 }
 
 .reset-button {
