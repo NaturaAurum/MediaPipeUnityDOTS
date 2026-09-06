@@ -21,6 +21,7 @@ namespace MediaPipeUnityDots.Runtime.Tracking
         private readonly int _numHands;
         private readonly HandTrackingSnapshot _snapshot;
         private readonly MonotonicTimestampGenerator _timestampGenerator;
+        private readonly SubmitStampMap _stampMap = new();
 
         private IntPtr _trackerHandle;
         private Color32[] _flipBuffer;
@@ -64,6 +65,12 @@ namespace MediaPipeUnityDots.Runtime.Tracking
 
         public long LatestFrameCount => _snapshot.FrameCount;
 
+        public long LatestCaptureId => _snapshot.CaptureId;
+
+        public long LatestCaptureTimestampUs => _snapshot.CaptureTimestampUs;
+
+        public long LatestCaptureEpoch => _snapshot.CaptureEpoch;
+
         public int LatestHandCount => _snapshot.HandCount;
 
         public int GetLatestHandedness(int hand) => _snapshot.GetHandedness(hand);
@@ -77,7 +84,7 @@ namespace MediaPipeUnityDots.Runtime.Tracking
         /// flipVertically=true이면 내부 flip 버퍼에 상하 반전 후 submit.
         /// submit 성공 시 즉시 poll하여 스냅샷을 갱신한다.
         /// </summary>
-        public void SubmitAndPoll(Color32[] pixels, int width, int height, bool flipVertically = true)
+        public void SubmitAndPoll(Color32[] pixels, int width, int height, bool flipVertically, CaptureStamp stamp)
         {
             ThrowIfDisposed();
 
@@ -116,6 +123,9 @@ namespace MediaPipeUnityDots.Runtime.Tracking
                 submitPixels = _flipBuffer;
             }
 
+            var submitTimestampUs = _timestampGenerator.NextTimestampUs();
+            _stampMap.Register(submitTimestampUs, stamp);
+
             GCHandle pinnedHandle = default;
             try
             {
@@ -124,7 +134,7 @@ namespace MediaPipeUnityDots.Runtime.Tracking
                     pinnedHandle,
                     width,
                     height,
-                    _timestampGenerator.NextTimestampUs());
+                    submitTimestampUs);
 
                 var submitStatus = MpudBridge.mpud_submit_frame(_trackerHandle, ref frame);
                 if (submitStatus != MpudStatus.Ok)
@@ -145,6 +155,8 @@ namespace MediaPipeUnityDots.Runtime.Tracking
             if (pollStatus == MpudStatus.Ok)
             {
                 _snapshot.UpdateFrom(ref result);
+                _stampMap.TryTake(_snapshot.TimestampUs, out var resolved);
+                _snapshot.SetCaptureStamp(resolved);
                 return;
             }
 
@@ -196,6 +208,7 @@ namespace MediaPipeUnityDots.Runtime.Tracking
 
             DestroyTracker();
             _snapshot.ResetToEmpty();
+            _stampMap.Clear();
             _flipBuffer = null;
 
             CreateAndStartTracker();

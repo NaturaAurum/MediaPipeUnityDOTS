@@ -44,6 +44,19 @@ namespace MediaPipeUnityDots.Runtime.Tracking
 
         public long FrameCount { get; private set; }
 
+        public long CaptureId { get; private set; }
+
+        public long CaptureTimestampUs { get; private set; }
+
+        public long CaptureEpoch { get; private set; }
+
+        internal void SetCaptureStamp(CaptureStamp stamp)
+        {
+            CaptureId = stamp.CaptureId;
+            CaptureTimestampUs = stamp.CaptureTimestampUs;
+            CaptureEpoch = stamp.CaptureEpoch;
+        }
+
         public int GetHandedness(int hand) => IsValidHand(hand) ? _handedness[hand] : -1;
 
         public float GetScore(int hand) => IsValidHand(hand) ? _scores[hand] : 0f;
@@ -204,6 +217,9 @@ namespace MediaPipeUnityDots.Runtime.Tracking
             HandCount = 0;
             TimestampUs = 0;
             FrameCount = 0;
+            CaptureId = 0;
+            CaptureTimestampUs = 0;
+            CaptureEpoch = 0;
 
             for (var h = 0; h < MaxHands; h++)
             {

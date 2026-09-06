@@ -45,6 +45,19 @@ namespace MediaPipeUnityDots.Runtime.Tracking
 
         public long FrameCount { get; private set; }
 
+        public long CaptureId { get; private set; }
+
+        public long CaptureTimestampUs { get; private set; }
+
+        public long CaptureEpoch { get; private set; }
+
+        internal void SetCaptureStamp(CaptureStamp stamp)
+        {
+            CaptureId = stamp.CaptureId;
+            CaptureTimestampUs = stamp.CaptureTimestampUs;
+            CaptureEpoch = stamp.CaptureEpoch;
+        }
+
         /// <summary>
         /// MpudHolisticResult로부터 스냅샷을 갱신한다.
         /// 부위별 개수를 capacity로 클램프하고 landmark를 언팩한다.
@@ -164,6 +177,9 @@ namespace MediaPipeUnityDots.Runtime.Tracking
             RightHandLandmarkCount = 0;
             TimestampUs = 0;
             FrameCount = 0;
+            CaptureId = 0;
+            CaptureTimestampUs = 0;
+            CaptureEpoch = 0;
         }
 
         private static int CopyOut(MpudNormalizedLandmark[] storage, int count, MpudNormalizedLandmark[] destination)

@@ -5,7 +5,9 @@
     "MediaPipeUnityDots.Runtime",
     "MediaPipeUnityDots.Sample",
     "Unity.Collections",
-    "Unity.Entities"
+    "Unity.Entities",
+    "Unity.InferenceEngine",
+    "Unity.Transforms"
   ],
   "includePlatforms": [
     "Editor"

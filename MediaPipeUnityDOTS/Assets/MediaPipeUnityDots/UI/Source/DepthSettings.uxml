@@ -1,0 +1,13 @@
+<UXML xmlns="UnityEngine.UIElements">
+    <Style src="DepthSettings.uss" />
+    <VisualElement name="depth-settings-panel" class="depth-settings-panel">
+        <Foldout text="Depth Z 보정 (실험)" name="depth-foldout" value="false" class="depth-foldout">
+            <Toggle name="depth-enabled-toggle" label="깊이 보정 활성화" value="false" class="setting-toggle" />
+            <Slider name="depth-weight-slider" label="가중치" low-value="0.0" high-value="1.0" value="0.0" show-input-field="true" class="setting-slider" />
+            <Slider name="depth-gain-slider" label="게인" low-value="0.0" high-value="5.0" value="1.0" show-input-field="true" class="setting-slider" />
+            <Slider name="depth-max-offset-slider" label="최대 오프셋" low-value="0.0" high-value="0.5" value="0.1" show-input-field="true" class="setting-slider" />
+            <Button name="depth-reset-defaults-button" text="기본값 복원" class="reset-button" />
+            <Label name="depth-status-label" text="상태: 비활성" class="status-label" />
+        </Foldout>
+    </VisualElement>
+</UXML>

@@ -35,6 +35,19 @@ namespace MediaPipeUnityDots.Runtime.Tracking
 
         public long FrameCount { get; private set; }
 
+        public long CaptureId { get; private set; }
+
+        public long CaptureTimestampUs { get; private set; }
+
+        public long CaptureEpoch { get; private set; }
+
+        internal void SetCaptureStamp(CaptureStamp stamp)
+        {
+            CaptureId = stamp.CaptureId;
+            CaptureTimestampUs = stamp.CaptureTimestampUs;
+            CaptureEpoch = stamp.CaptureEpoch;
+        }
+
         public int GetLandmarkCount(int pose) => IsValidPose(pose) ? _landmarkCounts[pose] : 0;
 
         /// <summary>
@@ -177,6 +190,9 @@ namespace MediaPipeUnityDots.Runtime.Tracking
             PoseCount = 0;
             TimestampUs = 0;
             FrameCount = 0;
+            CaptureId = 0;
+            CaptureTimestampUs = 0;
+            CaptureEpoch = 0;
 
             for (var p = 0; p < MaxPoses; p++)
             {

@@ -65,6 +65,26 @@
 - CPU 백엔드는 별도 성능을 측정한 경우에만 명시적으로 선택한다. GPU 실패 시 자동 전환해
   실시간 목표를 충족한 것처럼 표시하지 않는다.
 
+### P0 실측 기록 (2026-09-07)
+
+- 모델: `onnx-community/depth-anything-v2-small` `onnx/model.onnx` (fp32, 99,060,839B).
+  리비전 `4472b736`, SHA-256 `afb6a5c2…0a1df10c`, Apache-2.0, opset 14, weights `Depth-Anything-V2-Small`.
+- 그래프: 입력 `(N,3,H,W)` 동적, 출력 `predicted_depth (N,14*floor(H/14),14*floor(W/14))`.
+  연산자는 Add/MatMul/Conv/Softmax/Erf/Resize 등 표준 집합. 384/256 정사각 고정을 가정하지 않는다.
+- 전처리: 1/255 rescale, ImageNet mean/std, 종횡비 유지 후 14 배수 패딩, RGB·NCHW.
+  onnxruntime 실측에서 640x480→518x392 입력의 출력이 패딩 크기와 일치함을 확인.
+- Sentis 경로: Unity 6000.6.0f1 + InferenceEngine 2.6.1에서 ModelAsset import·CPU 스케줄·
+  비동기 리드백 완료를 `DepthSpikeTests`로 검증 (140px 그래디언트, 140x140 유한·분산 출력).
+- 실사진 출력: 전 범위 유한, 분위수 0.30~3.43, 이웃 기울기/전체 표준편차 1%로 공간 정합.
+  합성 평탄 영역은 분포 밖 입력으로 49%가 0이 되므로 방향 판정에 쓰지 않는다.
+- 방향 규약: 큰 값=가까움 (HF transformers 문서 등 복수 출처).
+  웹캠 실기에서 손 전후 이동으로 대표값 증감을 확인한 뒤 P2 블렌딩에 진입한다.
+- 배치 위치: `Assets/MediaPipeUnityDots/Models/*.onnx` + ModelAsset import.
+  `Load(path)`는 Sentis 직렬 형식이므로 raw ONNX에는 쓰지 않는다.
+  `.onnx`는 git 제외, `.onnx.meta` GUID는 커밋해 씬 참조를 유지한다.
+- 미측정 (인터랙티브 세션에서 수행): GPU 15Hz, MediaPipe 30fps 동시 유지,
+  캡처→리드백 지연 p50/p95, 프레임 시간 영향. 측정 로깅은 `DepthFrameProvider`에 내장한다.
+
 ### 작업 상태와 자원 수명
 
 1. Idle일 때 새로운 캡처 프레임만 제출한다. 같은 LatestPixels를 LateUpdate마다 재제출하지 않는다.
@@ -158,16 +178,41 @@ P0 실험 결과로 확정한 계약만 영구 코드에 반영한다. 아래는
 - DepthSampleStatus 및 대상별 샘플 버퍼: 캡처 ID/시각/세대, 원본 트래커 세대,
   대상 식별·유효성, 대표 깊이. Hand/Pose의 유효성은 독립적으로 기록한다.
 - 대상별 보정 상태: 기준선, 마지막 Depth 시각, 필터 상태, 세대. 관리 객체를 넣지 않는다.
+
 - DepthSamplingSingletonUtil: Depth 전용 싱글턴 단일 작성자 획득·해제.
   Hand/Pose 싱글턴 소유권을 획득하거나 원본을 초기화하지 않는다.
 
-### Runtime/Tracking/Depth
+### 신규 — `Runtime/Tracking/Depth/`
 
+- CaptureStamp: 캡처 ID·시각·세대 식별자. 제출→결과 매핑과 시간 정합에 쓴다.
+- SubmitStampMap: 제출 시각→캡처 스탬프 매핑. 미적중 시 무효 스탬프로 떨어진다.
+- DepthSampler: 좌표 역변환·보간·대상 대표값 계산. DPT 전처리 규격을 포함한다.
 - DepthInferenceService: 모델·Worker·텐서 수명, 단일 진행 작업, 리드백 완료 확인.
+- CaptureSnapshotRing: 동일 캡처의 Hand/Pose 스냅샷 보관. 깊이 완료 시 조회한다.
 - DepthFrameProvider: 명시적으로 연결된 웹캠, 캡처별 스냅샷 정합, 유효 샘플 게시.
-- DepthSampler: 좌표 역변환·보간·대상 대표값 계산. 모델 출력 방향/값 변환도 우선 이 파일에 둔다.
-  여러 모델 변환이 실제로 필요해질 때만 별도 Mapper 파일로 분리한다.
 
+### 신규 — UI (기존 직접 바인딩 패턴)
+
+- UI/Source/DepthSettings.uxml / .uss — Foldout "Depth Z 보정 (실험)": 활성화 토글,
+  가중치·게인·최대 오프셋 슬라이더, 초기화 버튼, 상태 라벨.
+- Sample/HandTracking/Scripts/DepthSettingsPanel.cs — OneEuroFilterSettingsPanel 답습.
+  컨트롤 바인딩 + ECS 푸시, R3/MVVM 도입 없음.
+
+## 6. P3 — UI와 수명주기
+
+- `OneEuroFilterSettingsPanel` 직접 바인딩 패턴을 답습한다. 코드베이스에 MVVM+R3 선례가 없고
+  R3는 매니페스트 의존성으로만 존재하므로, 단일 규약 규칙에 따라 새 규약을 도입하지 않는다.
+  UXML/USS 레이아웃 + C# 바인딩/ECS 푸시 구조를 그대로 따른다.
+- UXML/USS로 Depth Foldout(기본 닫힘), 활성화 토글, 가중치·게인·최대 오프셋 슬라이더,
+  초기화 버튼, 상태 라벨을 정의한다. 기본값은 `DepthSettings.Default`(Enabled=0, Weight=0)다.
+- View는 활성화/바인딩 주기의 콜백 등록·해제를 소유한다. `BindToRoot` 시작 시 `UnbindEvents`로
+  이전 바인딩을 해제하고, `OnDisable`과 UI 재바인딩에서 해제한다. `RemoveFromHierarchy`도 답습한다.
+- 설정값 검증을 입력 경계에서 수행한다. 가중치는 0~1 클램프, 게인·최대 오프셋은 음수와
+  비유한값을 거부한다. 슬라이더 범위를 벗어난 값은 들어오지 않게 UXML 범위를 고정한다.
+- UI→ECS는 설정 푸시, ECS→UI는 `DepthSampleStatus` 스냅샷(유효성·캡처 ID)이다.
+  상태 라벨은 푸시·바인딩 시점에 갱신하며 별도 폴링 루프를 두지 않는다.
+  단순히 Enabled를 켰다는 이유로 추론 정상 상태를 표시하지 않는다.
+- 설정 패널을 숨기는 것과 Depth 기능을 끄는 것은 구분한다. 기능 OFF는 결과 무효화와 진행 작업 폐기 계약을 따른다.
 ### 기존 파일 수정
 
 - WebcamFrameProvider 및 Hand/Pose/Holistic Service/Snapshot/Status: 캡처 스탬프의 제출→결과 전달,
@@ -177,17 +222,6 @@ P0 실험 결과로 확정한 계약만 영구 코드에 반영한다. 아래는
 - Runtime asmdef: Unity.InferenceEngine 참조. 테스트·Sample asmdef는 실제 사용하는 어셈블리만 추가한다.
 - EditorTool 모델 다운로드 스크립트와 .gitignore: 고정 출처·해시 검증과 누락 안내.
 - SampleScene: P3에서 DepthFrameProvider와 설정 UI만 명시적 직렬화 참조로 배선한다.
-
-## 6. P3 — UI와 수명주기
-
-- UXML/USS로 Depth Foldout, 활성화 토글, 가중치·시각화 보정값, 초기화, 상태 라벨을 정의한다.
-- Model은 ReactiveProperty 상태를 소유하고 구독하지 않는다. ViewModel은 상태 노출과 커맨드를 담당한다.
-- View는 활성화/바인딩 주기의 구독 묶음을 소유한다. OnDisable 및 UI 재바인딩에서 이전 구독을
-  해제한다. AddTo(this)만으로 활성화 주기의 수명을 관리하지 않는다.
-- Model을 다시 만들 때 이전 ReactiveProperty를 Dispose한다. 재바인딩으로 설정을 의도치 않게 초기화하지 않는다.
-- UI→ECS는 설정 푸시, ECS→UI는 처리율·결과 나이·유효성·실패 사유 스냅샷이다.
-  단순히 Enabled를 켰다는 이유로 추론 정상 상태를 표시하지 않는다.
-- 설정 패널을 숨기는 것과 Depth 기능을 끄는 것은 구분한다. 기능 OFF는 결과 무효화와 진행 작업 폐기 계약을 따른다.
 
 ## 7. 검증 항목
 
@@ -200,9 +234,9 @@ P0 실험 결과로 확정한 계약만 영구 코드에 반영한다. 아래는
 - OFF/weight=0/만료 시 기존 출력 일치, 동일 MediaPipe 시각에서 Depth만 갱신,
   ON→OFF→ON에서 XY 필터 연속성 및 보정 필터 초기화.
 - 중복 Depth 작성자 차단, 비소유자의 종료가 기존 결과를 초기화하지 않음.
-- UI 비활성화 중 푸시 없음, 재바인딩 후 중복 전달 없음, Model 자원 해제.
+- UI 바인딩·해제·재바인딩 수명주기, 기본값 동기화, 상태 라벨 표시.
 
-테스트는 위 동작·전이를 방어한다. ReactiveProperty 값 전달이나 필드 복사 자체를 위한 테스트는 만들지 않는다.
+테스트는 위 동작·전이를 방어한다. 값 전달이나 필드 복사 자체를 위한 테스트는 만들지 않는다.
 
 ### 실제 Unity 검증
 

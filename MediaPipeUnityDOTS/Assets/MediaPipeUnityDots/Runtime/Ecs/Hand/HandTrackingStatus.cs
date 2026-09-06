@@ -14,5 +14,11 @@ namespace MediaPipeUnityDots.Runtime.Ecs
         public int LandmarkCount;
         public long TimestampUs;
         public long FrameCount;
+
+        public long CaptureId;
+
+        public long CaptureTimestampUs;
+
+        public long CaptureEpoch;
     }
 }

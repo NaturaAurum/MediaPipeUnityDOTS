@@ -90,7 +90,7 @@ namespace MediaPipeUnityDots.Runtime.Tracking
             }
 
             var previousFrameCount = _service.LatestFrameCount;
-            _service.SubmitAndPoll(pixels, width, height, _webcamSource.LatestFlipVertically);
+            _service.SubmitAndPoll(pixels, width, height, _webcamSource.LatestFlipVertically, new CaptureStamp(_webcamSource.LatestCaptureId, _webcamSource.LatestCaptureTimestampUs, _webcamSource.CaptureEpoch));
 
             if (_service.LatestFrameCount == previousFrameCount)
             {
@@ -250,6 +250,9 @@ namespace MediaPipeUnityDots.Runtime.Tracking
                         LandmarkCount = count,
                         TimestampUs = _service.LatestTimestampUs,
                         FrameCount = _service.LatestFrameCount,
+                        CaptureId = _service.LatestCaptureId,
+                        CaptureTimestampUs = _service.LatestCaptureTimestampUs,
+                        CaptureEpoch = _service.LatestCaptureEpoch,
                     });
 
                 var landmarks = entityManager.GetBuffer<PoseLandmarkElement>(_poseSingleton);
@@ -301,7 +304,7 @@ namespace MediaPipeUnityDots.Runtime.Tracking
             }
 
             PoseTrackingSingletonUtil.WriteInvalidPolledState(
-                entityManager, _poseSingleton, _service.LatestTimestampUs, _service.LatestFrameCount);
+                entityManager, _poseSingleton, _service.LatestTimestampUs, _service.LatestFrameCount, _service.LatestCaptureId, _service.LatestCaptureTimestampUs, _service.LatestCaptureEpoch);
         }
 
         private void PushHandsToEcs(EntityManager entityManager)
@@ -315,7 +318,7 @@ namespace MediaPipeUnityDots.Runtime.Tracking
             if (handCount == 0)
             {
                 HandTrackingSingletonUtil.WriteInvalidPolledState(
-                    entityManager, _handSingleton, _service.LatestTimestampUs, _service.LatestFrameCount);
+                    entityManager, _handSingleton, _service.LatestTimestampUs, _service.LatestFrameCount, _service.LatestCaptureId, _service.LatestCaptureTimestampUs, _service.LatestCaptureEpoch);
                 return;
             }
 
@@ -328,6 +331,9 @@ namespace MediaPipeUnityDots.Runtime.Tracking
                 LandmarkCount = leftCount > 0 ? leftCount : rightCount,
                 TimestampUs = _service.LatestTimestampUs,
                 FrameCount = _service.LatestFrameCount,
+                CaptureId = _service.LatestCaptureId,
+                CaptureTimestampUs = _service.LatestCaptureTimestampUs,
+                CaptureEpoch = _service.LatestCaptureEpoch,
             };
             status.HandednessList.Clear();
             status.ScoreList.Clear();

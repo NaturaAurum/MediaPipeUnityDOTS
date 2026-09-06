@@ -83,7 +83,7 @@ namespace MediaPipeUnityDots.Runtime.Tracking
             }
 
             var previousFrameCount = _service.LatestFrameCount;
-            _service.SubmitAndPoll(pixels, width, height, _webcamSource.LatestFlipVertically);
+            _service.SubmitAndPoll(pixels, width, height, _webcamSource.LatestFlipVertically, new CaptureStamp(_webcamSource.LatestCaptureId, _webcamSource.LatestCaptureTimestampUs, _webcamSource.CaptureEpoch));
 
             if (_service.LatestFrameCount == previousFrameCount)
             {
@@ -178,7 +178,10 @@ namespace MediaPipeUnityDots.Runtime.Tracking
                 entityManager,
                 _singletonEntity,
                 _service.LatestTimestampUs,
-                _service.LatestFrameCount);
+                _service.LatestFrameCount,
+                _service.LatestCaptureId,
+                _service.LatestCaptureTimestampUs,
+                _service.LatestCaptureEpoch);
         }
 
         private void WriteValidPolledState(EntityManager entityManager)
@@ -194,6 +197,9 @@ namespace MediaPipeUnityDots.Runtime.Tracking
                     LandmarkCount = _service.LatestLandmarkCount,
                     TimestampUs = _service.LatestTimestampUs,
                     FrameCount = _service.LatestFrameCount,
+                    CaptureId = _service.LatestCaptureId,
+                    CaptureTimestampUs = _service.LatestCaptureTimestampUs,
+                    CaptureEpoch = _service.LatestCaptureEpoch,
                 });
 
             var landmarks = entityManager.GetBuffer<PoseLandmarkElement>(_singletonEntity);
