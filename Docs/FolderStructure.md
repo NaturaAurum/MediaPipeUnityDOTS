@@ -60,10 +60,12 @@ MediaPipeUnityDOTS/
 - `Assets/MediaPipeUnityDots`
   - 플러그인 본체 루트
 - `Assets/MediaPipeUnityDots/Runtime`
-  - C# interop 레이어
-  - runtime code
-  - DOTS systems and jobs
-  - bootstrap code
+  - C# interop 레이어 (`Interop`), 입력 유틸 (`Input`), 로깅 (`Logging`)
+  - `Ecs/Common|Hand|Face|Pose`: 컴포넌트·매핑·필터·스포너·렌더 시스템
+  - `Tracking/Hand|Face|Pose|Holistic`: 서비스·스냅샷·프로바이더
+    (+`Tracking` 루트의 공유 `WebcamFrameProvider`, `Hand`의 읽기 API)
+  - `Plugins/<platform>`: 네이티브 바이너리
+  - 폴더만 나누고 네임스페이스는 `Runtime.Ecs`/`Runtime.Tracking` 유지
 - `Assets/MediaPipeUnityDots/EditorTool`
   - editor utility code 후보 위치
   - 초반에는 최소한으로 유지
@@ -114,8 +116,8 @@ MediaPipeUnityDOTS/
 `Sample/HandTracking/Scripts`에서 플러그인 코어 체질을 `Runtime`으로 이동했다.
 
 - 승격됨: `Webcam/Face/Pose/HolisticFrameProvider`, `HandTrackingAdapter`,
-  `HandTrackingDto` → `Runtime/Tracking`. `Face/Hand/PoseLandmarkPointSpawner`
-  → `Runtime/Ecs` (Entities Graphics 의존 포함).
+  `HandTrackingDto` → `Tracking/Hand|Face|Pose|Holistic` (+공유 웹캠은 `Tracking` 루트).
+  `Face/Hand/PoseLandmarkPointSpawner` → `Ecs/Hand|Face|Pose` (Entities Graphics 의존 포함).
 - 잔류: `OneEuroFilterSettingsPanel`, `HandTrackingStatusPanel`
   (App 레이어 UI), `WebcamBackgroundRenderer`, `WebcamBackgroundToggle`
   (데모 씬 전용), `NativeSmokeTest`(+Editor 러너, 진단용).
