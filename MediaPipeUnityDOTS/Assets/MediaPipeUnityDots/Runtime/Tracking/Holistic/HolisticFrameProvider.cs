@@ -25,6 +25,14 @@ namespace MediaPipeUnityDots.Runtime.Tracking
         [SerializeField]
         private int _logIntervalFrames = 60;
 
+        // 전담 프로바이더와 같은 싱글턴에 쓰면 깜빡거린다. 소유자가 따로 있으면 꺼라.
+        [SerializeField]
+        private bool _publishFace = true;
+        [SerializeField]
+        private bool _publishPose = true;
+        [SerializeField]
+        private bool _publishHands = true;
+
         private HolisticTrackingService _service;
         private MpudNormalizedLandmark[] _faceCopyBuffer;
         private MpudNormalizedLandmark[] _poseCopyBuffer;
@@ -169,9 +177,20 @@ namespace MediaPipeUnityDots.Runtime.Tracking
 
         private void PushAllToEcs(EntityManager entityManager)
         {
-            PushFaceToEcs(entityManager);
-            PushPoseToEcs(entityManager);
-            PushHandsToEcs(entityManager);
+            if (_publishFace)
+            {
+                PushFaceToEcs(entityManager);
+            }
+
+            if (_publishPose)
+            {
+                PushPoseToEcs(entityManager);
+            }
+
+            if (_publishHands)
+            {
+                PushHandsToEcs(entityManager);
+            }
         }
 
         private void PushFaceToEcs(EntityManager entityManager)

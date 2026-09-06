@@ -1074,6 +1074,9 @@ MonoBehaviour:
   _minDetectionConfidence: 0.5
   _minPresenceConfidence: 0.5
   _logIntervalFrames: 60
+  _publishFace: 0
+  _publishPose: 0
+  _publishHands: 0
 --- !u!1 &1950000101
 GameObject:
   m_ObjectHideFlags: 0
