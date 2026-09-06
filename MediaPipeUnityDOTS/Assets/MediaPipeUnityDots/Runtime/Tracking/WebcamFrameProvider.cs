@@ -6,10 +6,10 @@ using MediaPipeUnityDots.Runtime.Tracking;
 using Unity.Entities;
 using UnityEngine;
 
-namespace MediaPipeUnityDots.Sample.HandTracking.Scripts
+namespace MediaPipeUnityDots.Runtime.Tracking
 {
     /// <summary>
-    /// WebCamTexture로부터 프레임을 캡처하고 HandTrackingService에 제출하는 샘플 프로바이더.
+    /// WebCamTexture로부터 프레임을 캡처하고 HandTrackingService에 제출하는 런타임 프로바이더.
     /// </summary>
     public class WebcamFrameProvider : MonoBehaviour
     {

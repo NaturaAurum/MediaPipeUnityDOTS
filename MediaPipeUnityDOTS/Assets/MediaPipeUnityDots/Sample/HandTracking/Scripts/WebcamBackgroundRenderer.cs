@@ -1,4 +1,5 @@
 using MediaPipeUnityDots.Runtime.Ecs;
+using MediaPipeUnityDots.Runtime.Tracking;
 using Unity.Entities;
 using Unity.Mathematics;
 using UnityEngine;

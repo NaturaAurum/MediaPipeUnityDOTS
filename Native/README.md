@@ -40,7 +40,7 @@ Native/Build/CopyArtifactsToUnity.sh
 | 구분 | 경로 | 설명 |
 |------|------|------|
 | dylib (빌드 결과) | `Native/Artifacts/MacosEditor/libmpud_bridge.dylib` | Bazel 산출물 복사본 |
-| dylib (Unity 플러그인) | `MediaPipeUnityDOTS/Assets/Plugins/macOS/libmpud_bridge.dylib` | `CopyArtifactsToUnity.sh`가 복사, install name 보정, ad-hoc 서명 |
+| dylib (Unity 플러그인) | `MediaPipeUnityDOTS/Assets/MediaPipeUnityDots/Runtime/Plugins/macOS/libmpud_bridge.dylib` | `CopyArtifactsToUnity.sh`가 복사, install name 보정, ad-hoc 서명 |
 | 모델 | `MediaPipeUnityDOTS/Assets/StreamingAssets/MediaPipe/Models/` | 다운로드 대상. Git에는 `.meta`만 추적 |
 
 `DownloadModels.sh`는 아래 공식 float16 task bundle을 내려받는다.

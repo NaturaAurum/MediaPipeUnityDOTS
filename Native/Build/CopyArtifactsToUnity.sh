@@ -4,7 +4,7 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 NATIVE_DIR="$(dirname "$SCRIPT_DIR")"
 REPO_ROOT="$(dirname "$NATIVE_DIR")"
 SRC="$NATIVE_DIR/Artifacts/MacosEditor/libmpud_bridge.dylib"
-DEST_DIR="$REPO_ROOT/MediaPipeUnityDOTS/Assets/Plugins/macOS"
+DEST_DIR="$REPO_ROOT/MediaPipeUnityDOTS/Assets/MediaPipeUnityDots/Runtime/Plugins/macOS"
 DEST="$DEST_DIR/libmpud_bridge.dylib"
 
 if [ ! -f "$SRC" ]; then

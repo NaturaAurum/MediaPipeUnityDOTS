@@ -69,12 +69,11 @@ MediaPipeUnityDOTS/
   - 초반에는 최소한으로 유지
   - Unity의 특수 `Editor` 폴더를 바로 쓰지 않기 위한 완충 영역
 - `Assets/Plugins`
-  - 최종 배포용 네이티브 바이너리
-  - 플랫폼별 플러그인 import 설정 대상
+  - 비어 있음. 네이티브 바이너리는 `Runtime/Plugins/<platform>/` 로 이동 완료.
 - `Assets/MediaPipeUnityDots/Sample`
-  - 샘플용 MonoBehaviour (웹캠, 스포너, 디버그 UI)
-  - ECS 시각화 지원 (스포너 + 렌더 시스템)
-  - 예제 데이터 흐름 (adapter DTO)
+  - 데모 씬 전용 MonoBehaviour (디버그 UI, 웹캠 배경, 스모크 테스트)
+  - 프레임 프로바이더·스포너·어댑터/DTO는 `Runtime`으로 승격 완료
+    (아래 "Runtime 승격" 참조)
 - `Assets/Scenes`
   - 실행 씬과 테스트 씬
 - `Assets/Settings`
@@ -110,15 +109,13 @@ MediaPipeUnityDOTS/
 - `Assets/Scenes` 와 `Assets/Settings` 는 이미 존재하므로 그대로 유지하면서 `MediaPipeUnityDots`, `Plugins` 를 추가하는 쪽이 자연스럽습니다.
 - 패키지화는 브리지 계층 경계가 충분히 안정된 뒤 진행하는 것이 좋습니다.
 
-## Runtime 승격 후보 (Sample → Runtime)
+## Runtime 승격 (완료)
 
-`Sample/HandTracking/Scripts` 중 플러그인 코어 체질이라 패키징 시점에
-`Runtime`으로 옮길 파일. 지금은 단일 레포·단방향 참조라 이동하지 않는다.
+`Sample/HandTracking/Scripts`에서 플러그인 코어 체질을 `Runtime`으로 이동했다.
 
-- 승격: `Webcam/Face/Pose/HolisticFrameProvider`, `HandTrackingAdapter`,
-  `HandTrackingDto` (네이티브→ECS 진입점, 의존성 없음).
-- 조건부 승격: `Face/Hand/PoseLandmarkPointSpawner` — Entities Graphics
-  의존을 `Runtime` asmdef로 끌고 들어가므로 렌더링 의존 정리 후.
+- 승격됨: `Webcam/Face/Pose/HolisticFrameProvider`, `HandTrackingAdapter`,
+  `HandTrackingDto` → `Runtime/Tracking`. `Face/Hand/PoseLandmarkPointSpawner`
+  → `Runtime/Ecs` (Entities Graphics 의존 포함).
 - 잔류: `OneEuroFilterSettingsPanel`, `HandTrackingStatusPanel`
   (App 레이어 UI), `WebcamBackgroundRenderer`, `WebcamBackgroundToggle`
   (데모 씬 전용), `NativeSmokeTest`(+Editor 러너, 진단용).
@@ -129,28 +126,24 @@ MediaPipeUnityDOTS/
 성립하려면 브리지를 통해 얻은 값이 외부에서 가공하기 쉬워야 한다.
 
 - 외부 소비자는 `Runtime` 어셈블리만으로 값을 읽는다.
-  `Sample`/UI 어셈블리 참조 없이 접근 가능해야 한다.
-- 읽기 API(`Get*Landmark` 접근자, 스냅샷 복사 API)는 `Runtime`에 둔다.
-  가공용 DTO·어댑터는 소비 측(App 레이어) 책임이다.
-- ABI 변경은 세 가드로 버전 관리한다:
-  네이티브 `static_assert` + C# `ExpectedSize` + `NativeAbiTests`.
+  공식 읽기 API는 `HandTrackingAdapter`/`HandTrackingDto`
+  (`Runtime/Tracking`)이며, `Sample`/UI 어셈블리 참조 없이 접근 가능하다.
+- 읽기 API(`Get*Landmark` 접근자, 스냅샷 복사 API, 어댑터/DTO)는 `Runtime`에 둔다.
 - `Runtime`에 UI(App 레이어) 의존을 넣지 않는다
   (R3/UniTask/VContainer/UI Toolkit 금지 — AGENTS.md UI/ECS 경계).
 
-## package.json 계획 (UPM 분리 시점)
+## package.json (생성됨)
 
 - 위치: `Assets/MediaPipeUnityDots/package.json` (임베디드 패키지 루트).
-- `name` 가칭: `com.natura-aurum.mediapipe-unity-dots`, `unity` 최소 `6000.0`
-  (검증 환경 `6000.6.0f1`).
+- `name` 가칭: `com.natura-aurum.mediapipe-unity-dots` (`0.1.0`),
+  `unity` 최소 `6000.0` (검증 환경 `6000.6.0f1`).
 - `dependencies` (잠금 버전 기준, `packages-lock.json` 실측):
   - `com.unity.burst`: `2.0.0`
   - `com.unity.collections`: `6.6.0`
   - `com.unity.entities`: `6.6.0`
   - `com.unity.mathematics`: `1.4.0`
-  - `com.unity.entities.graphics`: `6.6.0` — 조건부. 현재 Runtime C#에서
-    직접 사용하지 않으므로 스포너 승격 시에만 포함.
-- 포함하지 않는다: R3/UniTask/VContainer (git URL 의존성 + App 전용),
-  URP, 테스트·프로파일러·IDE 등 에디터 전용 패키지.
-- 레이아웃 변경: `Sample/` → `Samples~/` (UPM 샘플 관례),
-  `Assets/Plugins`의 네이티브 바이너리는 패키지 내
-  `Runtime/Plugins/<platform>/` 로 이동.
+  - `com.unity.entities.graphics`: `6.6.0` — 스포너가 `Unity.Rendering`을
+    사용하므로 필수.
+- 레이아웃: `Sample/`은 유지한다. 이 저장소가 패키지 원본과 데모 프로젝트를
+  겸하므로 UPM 관례 `Samples~/` 전환은 저장소 분리 시점으로 연기한다.
+  네이티브 바이너리는 패키지 내 `Runtime/Plugins/<platform>/` 로 이동 완료.

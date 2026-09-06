@@ -1,4 +1,4 @@
-using MediaPipeUnityDots.Runtime.Ecs;
+using MediaPipeUnityDots.Runtime.Tracking;
 using Unity.Entities;
 using Unity.Mathematics;
 using Unity.Rendering;
@@ -6,7 +6,7 @@ using Unity.Transforms;
 using UnityEngine;
 using UnityEngine.Rendering;
 
-namespace MediaPipeUnityDots.Sample.HandTracking.Scripts
+namespace MediaPipeUnityDots.Runtime.Ecs
 {
     /// <summary>
     /// 얼굴별 478개 랜드마크 포인트 엔티티를 생성하는 sample layer 스포너.

@@ -1,0 +1,14 @@
+{
+  "name": "com.natura-aurum.mediapipe-unity-dots",
+  "version": "0.1.0",
+  "displayName": "MediaPipe Unity DOTS",
+  "description": "MediaPipe Tasks vision (hand, face, pose, holistic) bridge for Unity DOTS. Native inference plus ECS landmark buffers, filters, and render systems.",
+  "unity": "6000.0",
+  "dependencies": {
+    "com.unity.burst": "2.0.0",
+    "com.unity.collections": "6.6.0",
+    "com.unity.entities": "6.6.0",
+    "com.unity.entities.graphics": "6.6.0",
+    "com.unity.mathematics": "1.4.0"
+  }
+}
