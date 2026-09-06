@@ -46,9 +46,13 @@ namespace MediaPipeUnityDots.Runtime.Ecs
             }
         }
 
-        public static void WriteInvalidPolledState(EntityManager entityManager, Entity entity, long timestampUs, long frameCount)
+        public static void WriteInvalidPolledState(EntityManager entityManager, Entity entity, long timestampUs, long frameCount, long captureId, long captureTimestampUs, long captureEpoch)
         {
-            entityManager.SetComponentData(entity, CreateEmptyStatus(timestampUs, frameCount));
+            var status = CreateEmptyStatus(timestampUs, frameCount);
+            status.CaptureId = captureId;
+            status.CaptureTimestampUs = captureTimestampUs;
+            status.CaptureEpoch = captureEpoch;
+            entityManager.SetComponentData(entity, status);
         }
 
         public static void WriteResetEmptyState(EntityManager entityManager, Entity entity)

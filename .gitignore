@@ -52,6 +52,8 @@ Native/Upstream/mediapipe/bazel-*
 
 # MediaPipe 모델 바이너리 (용량이 크므로 git에서 제외)
 MediaPipeUnityDOTS/Assets/StreamingAssets/MediaPipe/Models/*.task
+# Depth ONNX (.onnx.meta GUID는 커밋해 씬 참조 유지)
+MediaPipeUnityDOTS/Assets/MediaPipeUnityDots/Models/*.onnx
 
 # 네이티브 빌드 산출물
 Native/Artifacts/MacosEditor/*.dylib

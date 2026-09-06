@@ -58,6 +58,16 @@ namespace MediaPipeUnityDots.Runtime.Ecs
             var faceStatus = hasFace ? SystemAPI.GetSingleton<FaceTrackingStatus>() : default;
             var poseStatus = hasPose ? SystemAPI.GetSingleton<PoseTrackingStatus>() : default;
 
+            DynamicBuffer<HandDepthSampleElement> handDepthSamples = default;
+            DynamicBuffer<PoseDepthSampleElement> poseDepthSamples = default;
+            var hasDepth = SystemAPI.HasSingleton<DepthSampleStatus>()
+                && SystemAPI.TryGetSingletonBuffer<HandDepthSampleElement>(out handDepthSamples, true)
+                && SystemAPI.TryGetSingletonBuffer<PoseDepthSampleElement>(out poseDepthSamples, true);
+            var depthStatus = hasDepth ? SystemAPI.GetSingleton<DepthSampleStatus>() : default;
+            var depthSettings = SystemAPI.HasSingleton<DepthSettings>()
+                ? SystemAPI.GetSingleton<DepthSettings>()
+                : DepthSettings.Default;
+
             var handDepths = new FixedList128Bytes<float2>();
             if (renderMode != 0 && hasHand && mapping.IsValid != 0 && handStatus.IsValid)
             {
@@ -117,8 +127,8 @@ namespace MediaPipeUnityDots.Runtime.Ecs
             var poseCutoff = new float3(filterSettings.PoseMinCutoff, filterSettings.PoseMinCutoff, filterSettings.ZMinCutoff);
             var poseBeta = new float3(filterSettings.PoseBeta, filterSettings.PoseBeta, filterSettings.ZBeta);
 
-            foreach (var (transform, point, filter)
-                in SystemAPI.Query<RefRW<LocalTransform>, RefRO<LandmarkPoint>, RefRW<LandmarkFilterState>>())
+            foreach (var (transform, point, filter, correctionState)
+                in SystemAPI.Query<RefRW<LocalTransform>, RefRO<LandmarkPoint>, RefRW<LandmarkFilterState>, RefRW<LandmarkDepthCorrection>>())
             {
                 var tracker = point.ValueRO.Tracker;
                 var target = point.ValueRO.Target;
@@ -134,6 +144,9 @@ namespace MediaPipeUnityDots.Runtime.Ecs
                 var beta = handBeta;
                 var timestampUs = 0L;
                 var pointScale = HandPointScale;
+
+                var correction = 0f;
+                var useCorrection = 0;
 
                 if (valid)
                 {
@@ -218,12 +231,42 @@ namespace MediaPipeUnityDots.Runtime.Ecs
                     }
                 }
 
+                if (valid && useDepth != 0 && renderMode != 0)
+                {
+                    if (tracker == LandmarkTracker.Hand && hasDepth && depthStatus.IsValid
+                        && target < handDepthSamples.Length && handDepthSamples[target].HandIndex == target
+                        && (depthStatus.HandValidMask & (1 << target)) != 0
+                        && depthStatus.CaptureEpoch == handStatus.CaptureEpoch
+                        && DepthSampleGate.IsAligned(handStatus.CaptureTimestampUs, depthStatus.CaptureTimestampUs, depthSettings.MaxAlignmentDeltaUs))
+                    {
+                        var identity = target < handStatus.HandednessList.Length ? handStatus.HandednessList[target] : -1;
+                        LandmarkRender.UpdateDepthCorrection(ref correctionState.ValueRW, true, handDepthSamples[target].Depth, depthStatus.CaptureTimestampUs, depthStatus.CaptureEpoch, identity, depthSettings, out correction, out useCorrection);
+                    }
+                    else if (tracker == LandmarkTracker.Pose && hasDepth && depthStatus.IsValid && depthStatus.PoseValid != 0
+                        && target < poseDepthSamples.Length && poseDepthSamples[target].PoseIndex == target
+                        && depthStatus.CaptureEpoch == poseStatus.CaptureEpoch
+                        && DepthSampleGate.IsAligned(poseStatus.CaptureTimestampUs, depthStatus.CaptureTimestampUs, depthSettings.MaxAlignmentDeltaUs))
+                    {
+                        LandmarkRender.UpdateDepthCorrection(ref correctionState.ValueRW, true, poseDepthSamples[target].Depth, depthStatus.CaptureTimestampUs, depthStatus.CaptureEpoch, 0, depthSettings, out correction, out useCorrection);
+                    }
+                    else
+                    {
+                        correctionState.ValueRW.Initialized = 0;
+                    }
+                }
+                else
+                {
+                    correctionState.ValueRW.Initialized = 0;
+                }
+
+
                 if (valid)
                 {
                     LandmarkRender.ResolvePoint(
                         imageX, imageY, worldZ, depthScale, depthFarZ, useDepth,
                         ref filter.ValueRW, filterSettings.Enabled,
                         minCutoff, beta, filterSettings.DerivativeCutoffHz, timestampUs,
+                        correction, useCorrection,
                         in mapping, out var targetPos);
                     transform.ValueRW = LocalTransform.FromPositionRotationScale(
                         targetPos, quaternion.identity, pointScale);

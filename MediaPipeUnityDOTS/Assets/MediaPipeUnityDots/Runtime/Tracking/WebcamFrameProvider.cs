@@ -2,6 +2,7 @@ using System;
 using System.IO;
 using MediaPipeUnityDots.Runtime.Ecs;
 using MediaPipeUnityDots.Runtime.Interop;
+using MediaPipeUnityDots.Runtime.Input;
 using MediaPipeUnityDots.Runtime.Tracking;
 using Unity.Entities;
 using UnityEngine;
@@ -43,12 +44,24 @@ namespace MediaPipeUnityDots.Runtime.Tracking
 
         public bool LatestFlipVertically { get; private set; }
 
+        public long LatestCaptureId => _latestCaptureId;
+
+        public long LatestCaptureTimestampUs => _latestCaptureTimestampUs;
+
+        public long CaptureEpoch => _captureEpoch;
+
+        public long CaptureClockUs => _captureClock.PeekTimestampUs();
+
         private WebCamTexture _webCamTexture;
         private HandTrackingService _service;
         private Color32[] _pixelBuffer;
         private MpudNormalizedLandmark[] _landmarkCopyBuffer;
         private World _ecsWorld;
         private Entity _singletonEntity;
+        private readonly MonotonicTimestampGenerator _captureClock = new();
+        private long _captureEpoch;
+        private long _latestCaptureId;
+        private long _latestCaptureTimestampUs;
         private bool _hasLoggedRuntimeMetadata;
         private bool _hasLoggedFrameSummary;
         private bool _lastLoggedFrameIsValid;
@@ -119,6 +132,8 @@ namespace MediaPipeUnityDots.Runtime.Tracking
             LatestPixelWidth = width;
             LatestPixelHeight = height;
             LatestFlipVertically = flipVertically;
+            _latestCaptureId++;
+            _latestCaptureTimestampUs = _captureClock.NextTimestampUs();
             if (!_hasLoggedRuntimeMetadata)
             {
                 MpudLog.Log(
@@ -127,7 +142,7 @@ namespace MediaPipeUnityDots.Runtime.Tracking
             }
 
             var previousFrameCount = _service.LatestFrameCount;
-            _service.SubmitAndPoll(_pixelBuffer, width, height, flipVertically);
+            _service.SubmitAndPoll(_pixelBuffer, width, height, flipVertically, new CaptureStamp(_latestCaptureId, _latestCaptureTimestampUs, _captureEpoch));
 
             if (_service.LatestFrameCount == previousFrameCount)
             {
@@ -208,6 +223,9 @@ namespace MediaPipeUnityDots.Runtime.Tracking
             _landmarkCopyBuffer = new MpudNormalizedLandmark[LandmarkCapacity];
             _ecsWorld = null;
             _singletonEntity = Entity.Null;
+            _captureEpoch++;
+            _latestCaptureId = 0;
+            _latestCaptureTimestampUs = 0;
             _hasLoggedRuntimeMetadata = false;
             _hasLoggedFrameSummary = false;
             _lastLoggedFrameIsValid = false;
@@ -268,6 +286,7 @@ namespace MediaPipeUnityDots.Runtime.Tracking
             }
 
             _service.ResetTracker();
+            _captureEpoch++;
             _pendingResetSnapshotPush = true;
             // reset-empty 상태는 ts=0을 유지해야 다음 poll 결과가 dedupe를 통과한다.
             _lastCopiedTimestamp = 0;
@@ -285,7 +304,10 @@ namespace MediaPipeUnityDots.Runtime.Tracking
                 entityManager,
                 _singletonEntity,
                 _service.LatestTimestampUs,
-                _service.LatestFrameCount);
+                _service.LatestFrameCount,
+                _service.LatestCaptureId,
+                _service.LatestCaptureTimestampUs,
+                _service.LatestCaptureEpoch);
         }
         private void WriteValidPolledState(EntityManager entityManager)
         {
@@ -300,6 +322,9 @@ namespace MediaPipeUnityDots.Runtime.Tracking
                 LandmarkCount = _service.LatestLandmarkCount,
                 TimestampUs = _service.LatestTimestampUs,
                 FrameCount = _service.LatestFrameCount,
+                CaptureId = _service.LatestCaptureId,
+                CaptureTimestampUs = _service.LatestCaptureTimestampUs,
+                CaptureEpoch = _service.LatestCaptureEpoch,
             };
             status.HandednessList.Clear();
             status.ScoreList.Clear();

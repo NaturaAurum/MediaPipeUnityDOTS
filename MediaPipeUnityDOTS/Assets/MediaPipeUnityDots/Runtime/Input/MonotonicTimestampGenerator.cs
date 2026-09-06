@@ -30,6 +30,12 @@ namespace MediaPipeUnityDots.Runtime.Input
             return timestampUs;
         }
 
+        public long PeekTimestampUs()
+        {
+            var timestampUs = _stopwatch.ElapsedTicks * 1000000L / Stopwatch.Frequency;
+            return timestampUs <= _lastTimestampUs ? _lastTimestampUs : timestampUs;
+        }
+
         internal void ResetForRecreate()
         {
             _stopwatch.Restart();
