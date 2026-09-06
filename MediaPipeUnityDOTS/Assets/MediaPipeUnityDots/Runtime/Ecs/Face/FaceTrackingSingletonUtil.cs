@@ -17,6 +17,7 @@ namespace MediaPipeUnityDots.Runtime.Ecs
                     entityManager.AddComponentData(entity, CreateEmptyStatus(0L, 0L));
                     entityManager.AddBuffer<FaceLandmarkElement>(entity);
                     entityManager.AddBuffer<FaceBlendshapeElement>(entity);
+                    TrackingWriterOwnershipUtil.EnsureExists(entityManager, entity);
                     return entity;
                 }
 
@@ -32,6 +33,7 @@ namespace MediaPipeUnityDots.Runtime.Ecs
                     {
                         entityManager.AddBuffer<FaceBlendshapeElement>(entity);
                     }
+                    TrackingWriterOwnershipUtil.EnsureExists(entityManager, entity);
 
                     return entity;
                 }

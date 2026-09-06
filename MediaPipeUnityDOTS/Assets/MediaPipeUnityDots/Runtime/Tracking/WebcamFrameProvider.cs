@@ -55,6 +55,7 @@ namespace MediaPipeUnityDots.Runtime.Tracking
         private int _lastLoggedFrameHandedness;
         private int _lastLoggedFrameLandmarkCount;
         private bool _pendingResetSnapshotPush;
+        private bool _hasLoggedOwnershipConflict;
         private long _submitCount;
         private long _lastCopiedTimestamp;
 
@@ -86,7 +87,11 @@ namespace MediaPipeUnityDots.Runtime.Tracking
 
             if (_pendingResetSnapshotPush && TryGetEntityManager(out var resetEntityManager))
             {
-                HandTrackingSingletonUtil.WriteResetEmptyState(resetEntityManager, _singletonEntity);
+                if (EnsureHandOwnership(resetEntityManager))
+                {
+                    HandTrackingSingletonUtil.WriteResetEmptyState(resetEntityManager, _singletonEntity);
+                }
+
                 _pendingResetSnapshotPush = false;
             }
 
@@ -152,6 +157,11 @@ namespace MediaPipeUnityDots.Runtime.Tracking
             }
 
             if (_service.LatestTimestampUs <= _lastCopiedTimestamp)
+            {
+                return;
+            }
+
+            if (!EnsureHandOwnership(entityManager))
             {
                 return;
             }
@@ -383,6 +393,7 @@ namespace MediaPipeUnityDots.Runtime.Tracking
             if (_singletonEntity == Entity.Null || !entityManager.Exists(_singletonEntity))
             {
                 _singletonEntity = HandTrackingSingletonUtil.GetOrCreateSingleton(entityManager);
+                _hasLoggedOwnershipConflict = false;
             }
 
             return true;
@@ -395,8 +406,41 @@ namespace MediaPipeUnityDots.Runtime.Tracking
                 return;
             }
 
+            var owner = OwnerRaw();
+            if (!TrackingWriterOwnershipUtil.IsOwner(entityManager, _singletonEntity, owner))
+            {
+                return;
+            }
+
             HandTrackingSingletonUtil.WriteResetEmptyState(entityManager, _singletonEntity);
+            TrackingWriterOwnershipUtil.Release(entityManager, _singletonEntity, owner);
         }
+
+        // 싱글턴 단일 작성자 보장. 다른 프로바이더 소유면 이번 프레임 기록을 건너뛴다.
+        private bool EnsureHandOwnership(EntityManager entityManager)
+        {
+            var owner = OwnerRaw();
+            if (TrackingWriterOwnershipUtil.IsOwner(entityManager, _singletonEntity, owner))
+            {
+                return true;
+            }
+
+            if (TrackingWriterOwnershipUtil.TryAcquire(entityManager, _singletonEntity, owner))
+            {
+                _hasLoggedOwnershipConflict = false;
+                return true;
+            }
+
+            if (!_hasLoggedOwnershipConflict)
+            {
+                _hasLoggedOwnershipConflict = true;
+                MpudLog.Warning("[MPUD] Hand 싱글턴이 다른 프로바이더 소유라 기록을 건너뛴다.");
+            }
+
+            return false;
+        }
+
+        private ulong OwnerRaw() => EntityId.ToULong(GetEntityId());
 
         private bool ShouldLogSubmit()
         {
