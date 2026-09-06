@@ -685,7 +685,7 @@ GameObject:
   - component: {fileID: 1950000012}
   - component: {fileID: 1950000013}
   m_Layer: 0
-  m_Name: HandLandmarkPointSpawner
+  m_Name: LandmarkPointSpawner
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -715,10 +715,19 @@ MonoBehaviour:
   m_GameObject: {fileID: 1950000011}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 550f10bcfdbc4c38ad40981069bde037, type: 3}
+  m_Script: {fileID: 11500000, guid: d817b9d569724e998afac0a11fdf20a6, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  _provider: {fileID: 1941794863}
+  _trackers:
+  - Tracker: 0
+    Source: {fileID: 1941794863}
+    Color: {r: 0, g: 1, b: 0, a: 1}
+  - Tracker: 1
+    Source: {fileID: 1950000053}
+    Color: {r: 0, g: 1, b: 1, a: 1}
+  - Tracker: 2
+    Source: {fileID: 1950000073}
+    Color: {r: 1, g: 1, b: 0, a: 1}
 --- !u!1 &1950000021
 GameObject:
   m_ObjectHideFlags: 0
@@ -968,51 +977,6 @@ MonoBehaviour:
   _numFaces: 1
   _minDetectionConfidence: 0.3
   _minTrackingConfidence: 0.3
---- !u!1 &1950000061
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 1950000062}
-  - component: {fileID: 1950000063}
-  m_Layer: 0
-  m_Name: FaceLandmarkPointSpawner
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!4 &1950000062
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1950000061}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 0}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &1950000063
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1950000061}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 824ba9ddd1d0405bae8323d0fec9a703, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  _provider: {fileID: 1950000053}
 --- !u!1 &1950000071
 GameObject:
   m_ObjectHideFlags: 0
@@ -1062,51 +1026,6 @@ MonoBehaviour:
   _minDetectionConfidence: 0.5
   _minTrackingConfidence: 0.5
   _logIntervalFrames: 60
---- !u!1 &1950000081
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 1950000082}
-  - component: {fileID: 1950000083}
-  m_Layer: 0
-  m_Name: PoseLandmarkPointSpawner
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!4 &1950000082
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1950000081}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 0}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &1950000083
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1950000081}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: c719b8e5fc9046edb320fdc0728b8a9c, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  _provider: {fileID: 1950000073}
 --- !u!1 &1950000091
 GameObject:
   m_ObjectHideFlags: 0
@@ -1216,8 +1135,6 @@ SceneRoots:
   - {fileID: 1950000042}
   - {fileID: 1930514803}
   - {fileID: 1950000052}
-  - {fileID: 1950000062}
   - {fileID: 1950000072}
-  - {fileID: 1950000082}
   - {fileID: 1950000092}
   - {fileID: 1950000102}

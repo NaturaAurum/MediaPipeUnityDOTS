@@ -333,7 +333,7 @@ namespace MediaPipeUnityDots.Runtime.Tracking
                 slot++;
             }
 
-            var world = entityManager.GetBuffer<WorldLandmarkElement>(_handSingleton);
+            var world = entityManager.GetBuffer<HandWorldLandmarkElement>(_handSingleton);
             if (world.Length != handCount * 21)
             {
                 world.ResizeUninitialized(handCount * 21);
@@ -349,7 +349,7 @@ namespace MediaPipeUnityDots.Runtime.Tracking
                     if (i < leftWorldCount)
                     {
                         var worldSource = _handCopyBuffer[i];
-                        world[bufferIndex] = new WorldLandmarkElement
+                        world[bufferIndex] = new HandWorldLandmarkElement
                         {
                             X = worldSource.x,
                             Y = worldSource.y,
@@ -360,7 +360,7 @@ namespace MediaPipeUnityDots.Runtime.Tracking
                     }
                     else
                     {
-                        world[bufferIndex] = new WorldLandmarkElement { HandIndex = -1 };
+                        world[bufferIndex] = new HandWorldLandmarkElement { HandIndex = -1 };
                     }
                 }
 
@@ -376,7 +376,7 @@ namespace MediaPipeUnityDots.Runtime.Tracking
                     if (i < rightWorldCount)
                     {
                         var worldSource = _handCopyBuffer[i];
-                        world[bufferIndex] = new WorldLandmarkElement
+                        world[bufferIndex] = new HandWorldLandmarkElement
                         {
                             X = worldSource.x,
                             Y = worldSource.y,
@@ -387,7 +387,7 @@ namespace MediaPipeUnityDots.Runtime.Tracking
                     }
                     else
                     {
-                        world[bufferIndex] = new WorldLandmarkElement { HandIndex = -1 };
+                        world[bufferIndex] = new HandWorldLandmarkElement { HandIndex = -1 };
                     }
                 }
 

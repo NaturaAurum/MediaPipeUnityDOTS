@@ -12,7 +12,7 @@ namespace MediaPipeUnityDots.Runtime.Tracking
     /// 공유 웹캠 픽셀을 포즈 트래커에 제출하고 결과를 ECS에 푸시하는 런타임 프로바이더.
     /// WebcamFrameProvider.Update 이후에 동작하므로 LateUpdate에서 소비한다.
     /// </summary>
-    public sealed class PoseFrameProvider : MonoBehaviour
+    public sealed class PoseFrameProvider : MonoBehaviour, IPointSource
     {
         private const int LandmarkCapacity = 33;
 
@@ -31,6 +31,7 @@ namespace MediaPipeUnityDots.Runtime.Tracking
         /// 추적할 포즈 수. PoseTrackingService와 포인트 스포너가 공유한다.
         /// </summary>
         public int NumPoses => Mathf.Clamp(_numPoses, 1, MpudPoseResult.MaxPoses);
+        int IPointSource.MaxTargets => NumPoses;
 
         private PoseTrackingService _service;
         private MpudNormalizedLandmark[] _landmarkCopyBuffer;
