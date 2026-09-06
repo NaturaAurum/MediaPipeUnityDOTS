@@ -2,7 +2,7 @@ using MediaPipeUnityDots.Runtime.Ecs;
 using Unity.Entities;
 using UnityEngine;
 
-namespace MediaPipeUnityDots.Sample.HandTracking.Scripts
+namespace MediaPipeUnityDots.Runtime.Tracking
 {
     /// <summary>
     /// ECS에서 hand tracking 상태를 읽어 caller-owned DTO에 복사하는 유일한 reader.

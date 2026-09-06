@@ -6,10 +6,10 @@ using MediaPipeUnityDots.Runtime.Tracking;
 using Unity.Entities;
 using UnityEngine;
 
-namespace MediaPipeUnityDots.Sample.HandTracking.Scripts
+namespace MediaPipeUnityDots.Runtime.Tracking
 {
     /// <summary>
-    /// 단일 holistic 추론으로 얼굴/포즈/양손을 기존 ECS 싱글턴에 푸시하는 샘플 프로바이더.
+    /// 단일 holistic 추론으로 얼굴/포즈/양손을 기존 ECS 싱글턴에 푸시하는 런타임 프로바이더.
     /// 새 ECS/스포너를 만들지 않고 Face/Pose/Hand 싱글턴+버퍼를 재사용한다.
     /// 개별 트래커 프로바이더와 동시 실행하면 같은 싱글턴에 쓰므로 비교 시에는 한쪽을 끈다.
     /// WebcamFrameProvider.Update 이후에 동작하므로 LateUpdate에서 소비한다.

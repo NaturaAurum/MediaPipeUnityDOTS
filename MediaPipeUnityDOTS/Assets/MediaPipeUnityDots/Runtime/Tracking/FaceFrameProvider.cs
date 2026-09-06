@@ -6,38 +6,41 @@ using MediaPipeUnityDots.Runtime.Tracking;
 using Unity.Entities;
 using UnityEngine;
 
-namespace MediaPipeUnityDots.Sample.HandTracking.Scripts
+namespace MediaPipeUnityDots.Runtime.Tracking
 {
     /// <summary>
-    /// 공유 웹캠 픽셀을 포즈 트래커에 제출하고 결과를 ECS에 푸시하는 샘플 프로바이더.
+    /// 공유 웹캠 픽셀을 얼굴 트래커에 제출하고 결과를 ECS에 푸시하는 런타임 프로바이더.
     /// WebcamFrameProvider.Update 이후에 동작하므로 LateUpdate에서 소비한다.
     /// </summary>
-    public sealed class PoseFrameProvider : MonoBehaviour
+    public sealed class FaceFrameProvider : MonoBehaviour
     {
-        private const int LandmarkCapacity = 33;
+        private const int LandmarkCapacity = 478;
 
         [SerializeField]
         private WebcamFrameProvider _webcamSource;
         [SerializeField]
-        private int _numPoses = 1;
+        private int _logIntervalFrames = 60;
+        [SerializeField]
+        private int _numFaces = 1;
         [SerializeField]
         private float _minDetectionConfidence = 0.5f;
         [SerializeField]
         private float _minTrackingConfidence = 0.5f;
-        [SerializeField]
-        private int _logIntervalFrames = 60;
 
         /// <summary>
-        /// 추적할 포즈 수. PoseTrackingService와 포인트 스포너가 공유한다.
+        /// 추적할 얼굴 수. FaceTrackingService와 포인트 스포너가 공유한다.
         /// </summary>
-        public int NumPoses => Mathf.Clamp(_numPoses, 1, MpudPoseResult.MaxPoses);
+        public int NumFaces => Mathf.Clamp(_numFaces, 1, MpudFaceResult.MaxFaces);
 
-        private PoseTrackingService _service;
+        private FaceTrackingService _service;
         private MpudNormalizedLandmark[] _landmarkCopyBuffer;
         private World _ecsWorld;
         private Entity _singletonEntity;
         private long _submitCount;
         private long _lastCopiedTimestamp;
+        // TEMP 진단용. 원인 확정 후 SampleHash/DumpInvalidFrame와 함께 삭제.
+        private int _prevHash;
+        private int _invalidDumpCount;
 
         private void OnEnable()
         {
@@ -48,7 +51,7 @@ namespace MediaPipeUnityDots.Sample.HandTracking.Scripts
 
             if (_webcamSource == null)
             {
-                MpudLog.Error("[MPUD] PoseFrameProvider needs WebcamFrameProvider.");
+                MpudLog.Error("[MPUD] FaceFrameProvider needs WebcamFrameProvider.");
                 enabled = false;
                 return;
             }
@@ -59,7 +62,7 @@ namespace MediaPipeUnityDots.Sample.HandTracking.Scripts
             }
             catch (Exception exception)
             {
-                MpudLog.Error($"[MPUD] Failed to initialize pose provider: {exception}");
+                MpudLog.Error($"[MPUD] Failed to initialize face provider: {exception}");
                 DisposeResources();
                 enabled = false;
             }
@@ -80,19 +83,37 @@ namespace MediaPipeUnityDots.Sample.HandTracking.Scripts
                 return;
             }
 
+            // TEMP 진단: 무효 프레임의 입력 영상 동결/지연 여부 판별용. 원인 확정 후 삭제.
+            var hash = SampleHash(pixels);
+            var submitStart = Time.realtimeSinceStartup;
             var previousFrameCount = _service.LatestFrameCount;
             _service.SubmitAndPoll(pixels, width, height, _webcamSource.LatestFlipVertically);
+            var latencyMs = (Time.realtimeSinceStartup - submitStart) * 1000f;
 
             if (_service.LatestFrameCount == previousFrameCount)
             {
                 return;
             }
 
+            if (!_service.LatestIsValid)
+            {
+                MpudLog.Warning($"[MPUD][DIAG] face invalid | hash={hash} sameAsPrev={hash == _prevHash} latencyMs={latencyMs:F1}");
+                // TEMP 진단: 무효 프레임 영상 3장 저장. 원인 확정 후 삭제.
+                if (_invalidDumpCount < 3)
+                {
+                    _invalidDumpCount++;
+                    DumpInvalidFrame(pixels, width, height);
+                }
+            }
+
+            _prevHash = hash;
+
             _submitCount++;
+
             if (MpudLog.Enabled && _logIntervalFrames > 0 && _submitCount % _logIntervalFrames == 0)
             {
                 MpudLog.Log(
-                    $"[MPUD] Pose frame #{_service.LatestFrameCount} | Valid={_service.LatestIsValid} | Poses={_service.LatestPoseCount} | Landmarks={_service.LatestLandmarkCount} | ts={_service.LatestTimestampUs}");
+                    $"[MPUD] Face frame #{_service.LatestFrameCount} | Valid={_service.LatestIsValid} | Faces={_service.LatestFaceCount} | Landmarks={_service.LatestLandmarkCount} | ts={_service.LatestTimestampUs}");
             }
 
             if (!TryGetEntityManager(out var entityManager))
@@ -128,13 +149,12 @@ namespace MediaPipeUnityDots.Sample.HandTracking.Scripts
                 Application.streamingAssetsPath,
                 "MediaPipe",
                 "Models",
-                "pose_landmarker_full.task");
+                "face_landmarker.task");
             if (!File.Exists(modelPath))
             {
-                throw new FileNotFoundException("pose_landmarker_full.task was not found.", modelPath);
+                throw new FileNotFoundException("face_landmarker.task was not found.", modelPath);
             }
-
-            _service = new PoseTrackingService(modelPath, NumPoses, _minDetectionConfidence, _minTrackingConfidence);
+            _service = new FaceTrackingService(modelPath, NumFaces, _minDetectionConfidence, _minTrackingConfidence);
             _landmarkCopyBuffer = new MpudNormalizedLandmark[LandmarkCapacity];
             _ecsWorld = null;
             _singletonEntity = Entity.Null;
@@ -143,7 +163,7 @@ namespace MediaPipeUnityDots.Sample.HandTracking.Scripts
 
             TryGetEntityManager(out _);
 
-            MpudLog.Log("[MPUD] Pose provider started.");
+            MpudLog.Log("[MPUD] Face provider started.");
         }
 
         private void DisposeResources()
@@ -159,6 +179,7 @@ namespace MediaPipeUnityDots.Sample.HandTracking.Scripts
             _singletonEntity = Entity.Null;
         }
 
+
         private void PushLatestSnapshotToEcs(EntityManager entityManager)
         {
             if (_service.LatestIsValid)
@@ -167,7 +188,7 @@ namespace MediaPipeUnityDots.Sample.HandTracking.Scripts
                 return;
             }
 
-            PoseTrackingSingletonUtil.WriteInvalidPolledState(
+            FaceTrackingSingletonUtil.WriteInvalidPolledState(
                 entityManager,
                 _singletonEntity,
                 _service.LatestTimestampUs,
@@ -176,78 +197,80 @@ namespace MediaPipeUnityDots.Sample.HandTracking.Scripts
 
         private void WriteValidPolledState(EntityManager entityManager)
         {
-            var poseCount = _service.LatestPoseCount;
+            var faceCount = _service.LatestFaceCount;
 
             entityManager.SetComponentData(
                 _singletonEntity,
-                new PoseTrackingStatus
+                new FaceTrackingStatus
                 {
                     IsValid = true,
-                    PoseCount = poseCount,
+                    FaceCount = faceCount,
                     LandmarkCount = _service.LatestLandmarkCount,
                     TimestampUs = _service.LatestTimestampUs,
                     FrameCount = _service.LatestFrameCount,
                 });
 
-            var landmarks = entityManager.GetBuffer<PoseLandmarkElement>(_singletonEntity);
-            if (landmarks.Length != poseCount * LandmarkCapacity)
+            var landmarks = entityManager.GetBuffer<FaceLandmarkElement>(_singletonEntity);
+            if (landmarks.Length != faceCount * LandmarkCapacity)
             {
-                landmarks.ResizeUninitialized(poseCount * LandmarkCapacity);
+                landmarks.ResizeUninitialized(faceCount * LandmarkCapacity);
             }
 
-            for (var p = 0; p < poseCount; p++)
+            for (var f = 0; f < faceCount; f++)
             {
-                var copiedCount = _service.CopyLatestPoseLandmarksTo(p, _landmarkCopyBuffer);
+                var copiedCount = _service.CopyLatestFaceLandmarksTo(f, _landmarkCopyBuffer);
                 for (var i = 0; i < LandmarkCapacity; i++)
                 {
-                    var bufferIndex = p * LandmarkCapacity + i;
+                    var bufferIndex = f * LandmarkCapacity + i;
                     if (i < copiedCount)
                     {
                         var source = _landmarkCopyBuffer[i];
-                        landmarks[bufferIndex] = new PoseLandmarkElement
+                        landmarks[bufferIndex] = new FaceLandmarkElement
                         {
                             X = source.x,
                             Y = source.y,
                             Z = source.z,
-                            PoseIndex = p,
+                            FaceIndex = f,
                         };
                     }
                     else
                     {
-                        landmarks[bufferIndex] = new PoseLandmarkElement { PoseIndex = -1 };
+                        landmarks[bufferIndex] = new FaceLandmarkElement { FaceIndex = -1 };
                     }
                 }
             }
+        }
 
-            var world = entityManager.GetBuffer<PoseWorldLandmarkElement>(_singletonEntity);
-            if (world.Length != poseCount * LandmarkCapacity)
+        // TEMP 진단용. 입력 영상이 프레임마다 바뀌는지 판별하는 cheap 해시. 원인 확정 후 삭제.
+        private static int SampleHash(Color32[] pixels)
+        {
+            var hash = 0;
+            for (var i = 0; i < pixels.Length; i += 4097)
             {
-                world.ResizeUninitialized(poseCount * LandmarkCapacity);
+                hash = hash * 31 + pixels[i].r + pixels[i].g * 2 + pixels[i].b * 3;
             }
 
-            for (var p = 0; p < poseCount; p++)
+            return hash;
+        }
+
+        // TEMP 진단용. 무효 프레임 영상을 PNG로 저장한다. 원인 확정 후 삭제.
+        private static void DumpInvalidFrame(Color32[] pixels, int width, int height)
+        {
+            try
             {
-                var worldCount = _service.CopyLatestPoseWorldLandmarksTo(p, _landmarkCopyBuffer);
-                for (var i = 0; i < LandmarkCapacity; i++)
-                {
-                    var bufferIndex = p * LandmarkCapacity + i;
-                    if (i < worldCount)
-                    {
-                        var source = _landmarkCopyBuffer[i];
-                        world[bufferIndex] = new PoseWorldLandmarkElement
-                        {
-                            X = source.x,
-                            Y = source.y,
-                            Z = source.z,
-                            Visibility = source.visibility,
-                            PoseIndex = p,
-                        };
-                    }
-                    else
-                    {
-                        world[bufferIndex] = new PoseWorldLandmarkElement { PoseIndex = -1 };
-                    }
-                }
+                var tex = new Texture2D(width, height, TextureFormat.RGBA32, false);
+                tex.SetPixels32(pixels);
+                tex.Apply();
+                var path = System.IO.Path.Combine(
+                    Application.persistentDataPath,
+                    $"face_invalid_{System.DateTime.Now:HHmmss_fff}.png");
+                System.IO.File.WriteAllBytes(path, tex.EncodeToPNG());
+                UnityEngine.Object.Destroy(tex);
+                MpudLog.Warning($"[MPUD][DIAG] dumped {path}");
+            }
+            catch (System.Exception exception)
+            {
+                MpudLog.Warning($"[MPUD][DIAG] dump failed: {exception.Message}");
             }
         }
 
@@ -271,7 +294,7 @@ namespace MediaPipeUnityDots.Sample.HandTracking.Scripts
 
             if (_singletonEntity == Entity.Null || !defaultWorld.EntityManager.Exists(_singletonEntity))
             {
-                _singletonEntity = PoseTrackingSingletonUtil.GetOrCreateSingleton(defaultWorld.EntityManager);
+                _singletonEntity = FaceTrackingSingletonUtil.GetOrCreateSingleton(defaultWorld.EntityManager);
             }
 
             entityManager = defaultWorld.EntityManager;
@@ -283,7 +306,7 @@ namespace MediaPipeUnityDots.Sample.HandTracking.Scripts
             if (_ecsWorld is { IsCreated: true } && _singletonEntity != Entity.Null
                 && _ecsWorld.EntityManager.Exists(_singletonEntity))
             {
-                PoseTrackingSingletonUtil.WriteResetEmptyState(_ecsWorld.EntityManager, _singletonEntity);
+                FaceTrackingSingletonUtil.WriteResetEmptyState(_ecsWorld.EntityManager, _singletonEntity);
             }
         }
     }
