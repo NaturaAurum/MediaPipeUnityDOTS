@@ -104,7 +104,9 @@ namespace MediaPipeUnityDots.Sample.HandTracking.Scripts
             _quadRenderer.transform.SetPositionAndRotation(
                 cameraTransform.position + cameraTransform.forward * BackgroundDistance,
                 cameraTransform.rotation);
-            var height = 2f * BackgroundDistance * Mathf.Tan(_camera.fieldOfView * 0.5f * Mathf.Deg2Rad);
+            var height = _camera.orthographic
+                ? 2f * _camera.orthographicSize
+                : 2f * BackgroundDistance * Mathf.Tan(_camera.fieldOfView * 0.5f * Mathf.Deg2Rad);
             _quadRenderer.transform.localScale = new Vector3(height * _camera.aspect, height, 1f);
         }
         private void UpdateCoverUv(WebCamTexture video, out Vector2 uvScale, out Vector2 uvOffset)
@@ -174,6 +176,9 @@ namespace MediaPipeUnityDots.Sample.HandTracking.Scripts
                 AxisX = (float3)quadTransform.right * quadTransform.localScale.x,
                 AxisY = (float3)quadTransform.up * quadTransform.localScale.y,
                 Forward = quadTransform.forward,
+                CameraPosition = _camera.transform.position,
+                NearClipPlane = _camera.nearClipPlane,
+                IsPerspective = _camera.orthographic ? 0 : 1,
             });
         }
 

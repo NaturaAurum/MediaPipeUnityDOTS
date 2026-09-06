@@ -4,7 +4,7 @@
         <Foldout text="1 Euro Filter 튜닝" name="filter-foldout" value="true" class="filter-foldout">
             <Toggle name="filter-enabled-toggle" label="1 Euro 필터 활성화" value="true" class="setting-toggle" />
             <Toggle name="verbose-logging-toggle" label="상세 로그" value="false" class="setting-toggle" />
-            <Toggle name="render-mode-toggle" label="3D 월드" value="false" class="setting-toggle" />
+            <Toggle name="render-mode-toggle" label="3D 영상 정합" value="false" class="setting-toggle" />
             <Label text="Hand (손)" class="section-header" />
             <Slider name="hand-min-cutoff" label="Min Cutoff (Hz)" low-value="0.1" high-value="5.0" value="1.0" show-input-field="true" class="setting-slider" />
             <Slider name="hand-beta" label="Beta (속도 반응)" low-value="0.001" high-value="0.050" value="0.007" show-input-field="true" class="setting-slider" />

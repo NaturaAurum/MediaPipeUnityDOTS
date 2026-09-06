@@ -1,4 +1,5 @@
 using Unity.Burst;
+using Unity.Collections;
 using Unity.Entities;
 using Unity.Mathematics;
 using Unity.Transforms;
@@ -7,7 +8,7 @@ namespace MediaPipeUnityDots.Runtime.Ecs
 {
     /// <summary>
     /// 싱글턴 상태+버퍼를 읽어 포즈 포인트 엔티티의 LocalTransform을 기록한다.
-    /// 2D(정규화 오버레이)/3D(월드 미터, 고관절 앵커)를 RenderMode로 전환한다.
+    /// 2D/3D 모두 영상 XY에 정합하고, 3D는 월드 Z의 상대 깊이를 카메라 광선 위에 배치한다.
     /// 필터는 입력 타임스탬프가 바뀔 때만 전진하므로 렌더 FPS와 무관하다.
     /// 무효 상태나 버퍼 부족 인덱스는 필터 상태를 리셋하고 스케일 0으로 숨긴다.
     /// </summary>
@@ -17,9 +18,6 @@ namespace MediaPipeUnityDots.Runtime.Ecs
     {
         private const float PointScale = 0.04f;
         private const int MaxLandmarksPerPose = 33;
-        private const int LeftHipIndex = 23;
-        private const int RightHipIndex = 24;
-        private const float WorldScale = 1f;
 
         public void OnCreate(ref SystemState state)
         {
@@ -43,8 +41,31 @@ namespace MediaPipeUnityDots.Runtime.Ecs
             var renderMode = filterSettings.RenderMode;
             var minCutoff = new float3(filterSettings.PoseMinCutoff, filterSettings.PoseMinCutoff, filterSettings.ZMinCutoff);
             var beta = new float3(filterSettings.PoseBeta, filterSettings.PoseBeta, filterSettings.ZBeta);
-            var worldRight = math.normalize(mapping.AxisX);
-            var worldUp = math.normalize(mapping.AxisY);
+            var depthParameters = new FixedList128Bytes<float2>();
+            if (renderMode != 0 && mapping.IsValid != 0 && status.IsValid)
+            {
+                var poseCount = math.min(status.PoseCount, depthParameters.Capacity);
+                for (var pose = 0; pose < poseCount; pose++)
+                {
+                    var bounds = new LandmarkDepthBounds();
+                    var start = pose * MaxLandmarksPerPose;
+                    var end = math.min(start + MaxLandmarksPerPose, math.min(landmarks.Length, worldLandmarks.Length));
+                    for (var i = start; i < end; i++)
+                    {
+                        var image = landmarks[i];
+                        var world = worldLandmarks[i];
+                        var worldPosition = new float3(world.X, world.Y, world.Z);
+                        var imagePosition = new float2(image.X, image.Y);
+                        if (image.PoseIndex == pose && world.PoseIndex == pose
+                            && math.all(math.isfinite(imagePosition)) && math.all(math.isfinite(worldPosition)))
+                        {
+                            bounds.Add(imagePosition, worldPosition);
+                        }
+                    }
+
+                    depthParameters.Add(bounds.Resolve(in mapping));
+                }
+            }
 
             foreach ((var transform, var point, var filter)
                 in SystemAPI.Query<RefRW<LocalTransform>, RefRO<PoseLandmarkPoint>, RefRW<LandmarkFilterState>>())
@@ -57,59 +78,30 @@ namespace MediaPipeUnityDots.Runtime.Ecs
                     && bufferIndex >= 0 && bufferIndex < landmarks.Length
                     && landmarks[bufferIndex].PoseIndex == pose)
                 {
-                    if (filter.ValueRW.Mode != renderMode)
+                    var element = landmarks[bufferIndex];
+                    var useDepth = pose < depthParameters.Length && bufferIndex < worldLandmarks.Length
+                        && worldLandmarks[bufferIndex].PoseIndex == pose
+                        && math.isfinite(worldLandmarks[bufferIndex].Z)
+                        && math.all(math.isfinite(depthParameters[pose]));
+                    var mode = useDepth ? 1 : 0;
+                    if (filter.ValueRW.Mode != mode)
                     {
                         filter.ValueRW.Initialized = 0;
-                        filter.ValueRW.Mode = renderMode;
+                        filter.ValueRW.Mode = mode;
                     }
 
-                    var hipLeft = pose * MaxLandmarksPerPose + LeftHipIndex;
-                    var hipRight = pose * MaxLandmarksPerPose + RightHipIndex;
-                    float3 targetPos;
-                    if (renderMode != 0 && bufferIndex < worldLandmarks.Length
-                        && worldLandmarks[bufferIndex].PoseIndex == pose
-                        && hipLeft >= 0 && hipRight < landmarks.Length
-                        && hipRight < worldLandmarks.Length
-                        && landmarks[hipLeft].PoseIndex == pose
-                        && landmarks[hipRight].PoseIndex == pose
-                        && worldLandmarks[hipLeft].PoseIndex == pose
-                        && worldLandmarks[hipRight].PoseIndex == pose)
-                    {
-                        var w = worldLandmarks[bufferIndex];
-                        var filtered = OneEuroFilter.Filter(
-                            new float3(w.X, w.Y, w.Z),
-                            ref filter.ValueRW,
-                            filterSettings.Enabled,
-                            minCutoff,
-                            beta,
-                            filterSettings.DerivativeCutoffHz,
-                            inputTimestampUs);
-                        // 앵커는 원시 고관절 중점(필터 상태는 포인트별 소유라 공유 불가).
-                        var anchorNorm = (new float2(landmarks[hipLeft].X, landmarks[hipLeft].Y)
-                            + new float2(landmarks[hipRight].X, landmarks[hipRight].Y)) * 0.5f;
-                        var anchor = LandmarkOverlayMapping.Map(anchorNorm.x, anchorNorm.y, in mapping);
-                        var hipLeftWorld = worldLandmarks[hipLeft];
-                        var hipRightWorld = worldLandmarks[hipRight];
-                        var center = new float3(
-                            (hipLeftWorld.X + hipRightWorld.X) * 0.5f,
-                            (hipLeftWorld.Y + hipRightWorld.Y) * 0.5f,
-                            (hipLeftWorld.Z + hipRightWorld.Z) * 0.5f);
-                        targetPos = LandmarkOverlayMapping.MapWorld(
-                            filtered, center, anchor, worldRight, worldUp, mapping.Forward, WorldScale);
-                    }
-                    else
-                    {
-                        var element = landmarks[bufferIndex];
-                        var filtered = OneEuroFilter.Filter(
-                            new float3(element.X, element.Y, element.Z),
-                            ref filter.ValueRW,
-                            filterSettings.Enabled,
-                            minCutoff,
-                            beta,
-                            filterSettings.DerivativeCutoffHz,
-                            inputTimestampUs);
-                        targetPos = LandmarkOverlayMapping.Map(filtered.x, filtered.y, in mapping);
-                    }
+                    // 원점·고관절 변화 대신 최후방 점 기준의 상대 깊이를 필터링한다.
+                    var relativeDepth = useDepth ? worldLandmarks[bufferIndex].Z - depthParameters[pose].y : 0f;
+                    var filtered = OneEuroFilter.Filter(
+                        new float3(element.X, element.Y, relativeDepth),
+                        ref filter.ValueRW,
+                        filterSettings.Enabled,
+                        minCutoff,
+                        beta,
+                        filterSettings.DerivativeCutoffHz,
+                        inputTimestampUs);
+                    var depth = useDepth ? math.min(filtered.z, 0f) * depthParameters[pose].x : 0f;
+                    var targetPos = LandmarkOverlayMapping.MapWithDepth(filtered.x, filtered.y, depth, in mapping);
 
                     transform.ValueRW = LocalTransform.FromPositionRotationScale(
                         targetPos,
