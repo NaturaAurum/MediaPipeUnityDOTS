@@ -55,4 +55,4 @@ MediaPipeUnityDOTS/Assets/StreamingAssets/MediaPipe/Models/*.task
 
 # 네이티브 빌드 산출물
 Native/Artifacts/MacosEditor/*.dylib
-MediaPipeUnityDOTS/Assets/Plugins/macOS/*.dylib
+MediaPipeUnityDOTS/Assets/MediaPipeUnityDots/Runtime/Plugins/macOS/*.dylib
