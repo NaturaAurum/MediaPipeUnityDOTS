@@ -40,6 +40,7 @@ namespace MediaPipeUnityDots.Runtime.Tracking
         private Entity _singletonEntity;
         private long _submitCount;
         private long _lastCopiedTimestamp;
+        private bool _hasLoggedOwnershipConflict;
         // TEMP 진단용. 원인 확정 후 SampleHash/DumpInvalidFrame와 함께 삭제.
         private int _prevHash;
         private int _invalidDumpCount;
@@ -124,6 +125,11 @@ namespace MediaPipeUnityDots.Runtime.Tracking
             }
 
             if (_service.LatestTimestampUs <= _lastCopiedTimestamp)
+            {
+                return;
+            }
+
+            if (!EnsureFaceOwnership(entityManager))
             {
                 return;
             }
@@ -326,6 +332,7 @@ namespace MediaPipeUnityDots.Runtime.Tracking
             if (_singletonEntity == Entity.Null || !defaultWorld.EntityManager.Exists(_singletonEntity))
             {
                 _singletonEntity = FaceTrackingSingletonUtil.GetOrCreateSingleton(defaultWorld.EntityManager);
+                _hasLoggedOwnershipConflict = false;
             }
 
             entityManager = defaultWorld.EntityManager;
@@ -337,8 +344,41 @@ namespace MediaPipeUnityDots.Runtime.Tracking
             if (_ecsWorld is { IsCreated: true } && _singletonEntity != Entity.Null
                 && _ecsWorld.EntityManager.Exists(_singletonEntity))
             {
+                var owner = OwnerRaw();
+                if (!TrackingWriterOwnershipUtil.IsOwner(_ecsWorld.EntityManager, _singletonEntity, owner))
+                {
+                    return;
+                }
+
                 FaceTrackingSingletonUtil.WriteResetEmptyState(_ecsWorld.EntityManager, _singletonEntity);
+                TrackingWriterOwnershipUtil.Release(_ecsWorld.EntityManager, _singletonEntity, owner);
             }
         }
+
+        // 싱글턴 단일 작성자 보장. 다른 프로바이더 소유면 이번 프레임 기록을 건너뛴다.
+        private bool EnsureFaceOwnership(EntityManager entityManager)
+        {
+            var owner = OwnerRaw();
+            if (TrackingWriterOwnershipUtil.IsOwner(entityManager, _singletonEntity, owner))
+            {
+                return true;
+            }
+
+            if (TrackingWriterOwnershipUtil.TryAcquire(entityManager, _singletonEntity, owner))
+            {
+                _hasLoggedOwnershipConflict = false;
+                return true;
+            }
+
+            if (!_hasLoggedOwnershipConflict)
+            {
+                _hasLoggedOwnershipConflict = true;
+                MpudLog.Warning("[MPUD] Face 싱글턴이 다른 프로바이더 소유라 기록을 건너뛴다.");
+            }
+
+            return false;
+        }
+
+        private ulong OwnerRaw() => EntityId.ToULong(GetEntityId());
     }
 }

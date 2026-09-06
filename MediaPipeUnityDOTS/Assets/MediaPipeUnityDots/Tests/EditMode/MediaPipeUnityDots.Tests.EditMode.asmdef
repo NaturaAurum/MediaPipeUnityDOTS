@@ -3,7 +3,9 @@
   "rootNamespace": "MediaPipeUnityDots.Tests.EditMode",
   "references": [
     "MediaPipeUnityDots.Runtime",
-    "MediaPipeUnityDots.Sample"
+    "MediaPipeUnityDots.Sample",
+    "Unity.Collections",
+    "Unity.Entities"
   ],
   "includePlatforms": [
     "Editor"
