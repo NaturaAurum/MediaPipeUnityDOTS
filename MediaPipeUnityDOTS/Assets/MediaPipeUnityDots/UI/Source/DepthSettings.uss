@@ -1,6 +1,6 @@
 .depth-settings-panel {
     position: absolute;
-    top: 360px;
+    bottom: 16px;
     right: 16px;
     width: 320px;
     background-color: rgba(20, 20, 24, 0.88);
