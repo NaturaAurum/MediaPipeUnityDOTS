@@ -41,9 +41,7 @@ namespace MediaPipeUnityDots.Runtime.Tracking
         private long _submitCount;
         private long _lastCopiedTimestamp;
         private bool _hasLoggedOwnershipConflict;
-        // TEMP 진단용. 원인 확정 후 SampleHash/DumpInvalidFrame와 함께 삭제.
-        private int _prevHash;
-        private int _invalidDumpCount;
+        private bool _pendingResetSnapshotPush;
 
         private void OnEnable()
         {
@@ -78,6 +76,34 @@ namespace MediaPipeUnityDots.Runtime.Tracking
                 return;
             }
 
+            if (_pendingResetSnapshotPush && TryGetEntityManager(out var resetEntityManager))
+            {
+                if (EnsureFaceOwnership(resetEntityManager))
+                {
+                    FaceTrackingSingletonUtil.WriteResetEmptyState(resetEntityManager, _singletonEntity);
+                }
+
+                _pendingResetSnapshotPush = false;
+            }
+
+            if (_service.TryTakeCompleted())
+            {
+                if (MpudLog.Enabled && _logIntervalFrames > 0 && _submitCount % _logIntervalFrames == 0)
+                {
+                    MpudLog.Log(
+                        $"[MPUD] Face frame #{_service.LatestFrameCount} | Valid={_service.LatestIsValid} | Faces={_service.LatestFaceCount} | Landmarks={_service.LatestLandmarkCount} | ts={_service.LatestTimestampUs}");
+                }
+
+                if (TryGetEntityManager(out var entityManager)
+                    && _service.LatestTimestampUs > _lastCopiedTimestamp
+                    && EnsureFaceOwnership(entityManager))
+                {
+                    PushLatestSnapshotToEcs(entityManager);
+                    _lastCopiedTimestamp = _service.LatestTimestampUs;
+                }
+            }
+
+            // 완료 수신은 픽셀·해상도 가드보다 먼저 수행한다.
             var pixels = _webcamSource.LatestPixels;
             var width = _webcamSource.LatestPixelWidth;
             var height = _webcamSource.LatestPixelHeight;
@@ -86,56 +112,19 @@ namespace MediaPipeUnityDots.Runtime.Tracking
                 return;
             }
 
-            // TEMP 진단: 무효 프레임의 입력 영상 동결/지연 여부 판별용. 원인 확정 후 삭제.
-            var hash = SampleHash(pixels);
-            var submitStart = Time.realtimeSinceStartup;
-            var previousFrameCount = _service.LatestFrameCount;
-            _service.SubmitAndPoll(pixels, width, height, _webcamSource.LatestFlipVertically);
-            var latencyMs = (Time.realtimeSinceStartup - submitStart) * 1000f;
-
-            if (_service.LatestFrameCount == previousFrameCount)
+            var stamp = new CaptureStamp(
+                _webcamSource.LatestCaptureId,
+                _webcamSource.LatestCaptureTimestampUs,
+                _webcamSource.CaptureEpoch);
+            if (stamp.CaptureId == 0)
             {
                 return;
             }
 
-            if (!_service.LatestIsValid)
+            if (_service.TrySubmit(pixels, width, height, _webcamSource.LatestFlipVertically, stamp))
             {
-                MpudLog.Warning($"[MPUD][DIAG] face invalid | hash={hash} sameAsPrev={hash == _prevHash} latencyMs={latencyMs:F1}");
-                // TEMP 진단: 무효 프레임 영상 3장 저장. 원인 확정 후 삭제.
-                if (_invalidDumpCount < 3)
-                {
-                    _invalidDumpCount++;
-                    DumpInvalidFrame(pixels, width, height);
-                }
+                _submitCount++;
             }
-
-            _prevHash = hash;
-
-            _submitCount++;
-
-            if (MpudLog.Enabled && _logIntervalFrames > 0 && _submitCount % _logIntervalFrames == 0)
-            {
-                MpudLog.Log(
-                    $"[MPUD] Face frame #{_service.LatestFrameCount} | Valid={_service.LatestIsValid} | Faces={_service.LatestFaceCount} | Landmarks={_service.LatestLandmarkCount} | ts={_service.LatestTimestampUs}");
-            }
-
-            if (!TryGetEntityManager(out var entityManager))
-            {
-                return;
-            }
-
-            if (_service.LatestTimestampUs <= _lastCopiedTimestamp)
-            {
-                return;
-            }
-
-            if (!EnsureFaceOwnership(entityManager))
-            {
-                return;
-            }
-
-            PushLatestSnapshotToEcs(entityManager);
-            _lastCopiedTimestamp = _service.LatestTimestampUs;
         }
 
         private void OnDisable()
@@ -162,12 +151,20 @@ namespace MediaPipeUnityDots.Runtime.Tracking
             {
                 throw new FileNotFoundException("face_landmarker.task was not found.", modelPath);
             }
+
+            _service = new FaceTrackingService(
+                modelPath,
+                NumFaces,
+                _minDetectionConfidence,
+                _minTrackingConfidence);
             _landmarkCopyBuffer = new MpudNormalizedLandmark[LandmarkCapacity];
             _blendshapeCopyBuffer = new float[MpudFaceResult.BlendshapesPerFace];
             _ecsWorld = null;
             _singletonEntity = Entity.Null;
             _submitCount = 0;
             _lastCopiedTimestamp = 0;
+            _hasLoggedOwnershipConflict = false;
+            _pendingResetSnapshotPush = false;
 
             TryGetEntityManager(out _);
 
@@ -186,6 +183,22 @@ namespace MediaPipeUnityDots.Runtime.Tracking
             _blendshapeCopyBuffer = null;
             _ecsWorld = null;
             _singletonEntity = Entity.Null;
+            _submitCount = 0;
+            _lastCopiedTimestamp = 0;
+            _pendingResetSnapshotPush = false;
+        }
+
+        public void ResetTracker()
+        {
+            if (_service == null)
+            {
+                return;
+            }
+
+            _service.ResetTracker();
+            _webcamSource.BumpCaptureEpoch();
+            _pendingResetSnapshotPush = true;
+            _lastCopiedTimestamp = 0;
         }
 
 
@@ -278,38 +291,6 @@ namespace MediaPipeUnityDots.Runtime.Tracking
             }
         }
 
-        // TEMP 진단용. 입력 영상이 프레임마다 바뀌는지 판별하는 cheap 해시. 원인 확정 후 삭제.
-        private static int SampleHash(Color32[] pixels)
-        {
-            var hash = 0;
-            for (var i = 0; i < pixels.Length; i += 4097)
-            {
-                hash = hash * 31 + pixels[i].r + pixels[i].g * 2 + pixels[i].b * 3;
-            }
-
-            return hash;
-        }
-
-        // TEMP 진단용. 무효 프레임 영상을 PNG로 저장한다. 원인 확정 후 삭제.
-        private static void DumpInvalidFrame(Color32[] pixels, int width, int height)
-        {
-            try
-            {
-                var tex = new Texture2D(width, height, TextureFormat.RGBA32, false);
-                tex.SetPixels32(pixels);
-                tex.Apply();
-                var path = System.IO.Path.Combine(
-                    Application.persistentDataPath,
-                    $"face_invalid_{System.DateTime.Now:HHmmss_fff}.png");
-                System.IO.File.WriteAllBytes(path, tex.EncodeToPNG());
-                UnityEngine.Object.Destroy(tex);
-                MpudLog.Warning($"[MPUD][DIAG] dumped {path}");
-            }
-            catch (System.Exception exception)
-            {
-                MpudLog.Warning($"[MPUD][DIAG] dump failed: {exception.Message}");
-            }
-        }
 
         private bool TryGetEntityManager(out EntityManager entityManager)
         {

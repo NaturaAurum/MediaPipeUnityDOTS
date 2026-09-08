@@ -33,6 +33,8 @@ namespace MediaPipeUnityDots.Runtime.Tracking
         private long _pendingCaptureTimestampUs;
         private long _pendingCaptureEpoch;
         private long _completedCount;
+        private long _readbackFailures;
+        private const long ReadbackRetryTimeoutMs = 500;
 
         public DepthInferenceService(ModelAsset modelAsset, BackendType backendType)
         {
@@ -69,6 +71,8 @@ namespace MediaPipeUnityDots.Runtime.Tracking
         public float LastLatencyMs { get; private set; }
 
         public long CompletedCount => _completedCount;
+
+        public long ReadbackFailures => _readbackFailures;
 
         /// <summary>
         /// Idle일 때만 새 캡처를 제출한다. 호출자 배열은 복사되므로 재사용해도 된다.
@@ -112,7 +116,23 @@ namespace MediaPipeUnityDots.Runtime.Tracking
                 return false;
             }
 
-            var values = output.DownloadToArray();
+            float[] values;
+            try
+            {
+                values = output.DownloadToArray();
+            }
+            catch (Exception exception)
+            {
+                // 마감 초과면 새 요청 없이 폐기한다. 새 요청을 남기고 busy를 풀지 않는다.
+                if (_stopwatch.Elapsed.TotalMilliseconds > ReadbackRetryTimeoutMs)
+                {
+                    return FailReadback(exception.Message);
+                }
+
+                output.ReadbackRequest();
+                return false;
+            }
+
             var shape = output.shape;
             var (mapWidth, mapHeight) = shape.rank == 4
                 ? (shape[3], shape[2])
@@ -126,6 +146,7 @@ namespace MediaPipeUnityDots.Runtime.Tracking
             }
 
             _completedCount++;
+            _readbackFailures = 0;
             completed = new CompletedMap
             {
                 CaptureId = _pendingCaptureId,
@@ -137,6 +158,20 @@ namespace MediaPipeUnityDots.Runtime.Tracking
                 LatencyMs = LastLatencyMs,
             };
             return true;
+        }
+
+        // 완료 표시 후 데이터 접근 실패(GPU 리드백 레이스) 시 해당 결과만 폐기한다.
+        private bool FailReadback(string reason)
+        {
+            ReleaseInput();
+            _busy = false;
+            _readbackFailures++;
+            if (_readbackFailures == 1 || _readbackFailures % 60 == 0)
+            {
+                MpudLog.Warning($"[MPUD] Depth readback dropped ({_readbackFailures}): {reason}");
+            }
+
+            return false;
         }
 
         /// <summary>
@@ -155,8 +190,16 @@ namespace MediaPipeUnityDots.Runtime.Tracking
             }
 
             _disposed = true;
-            ReleaseInput();
-            _worker?.Dispose();
+            _busy = false;
+            _stale = true;
+            try
+            {
+                _worker?.Dispose();
+            }
+            finally
+            {
+                ReleaseInput();
+            }
         }
 
         private void ReleaseInput()

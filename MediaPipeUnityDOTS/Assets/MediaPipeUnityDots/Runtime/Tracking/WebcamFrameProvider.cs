@@ -1,37 +1,20 @@
 using System;
-using System.IO;
-using MediaPipeUnityDots.Runtime.Ecs;
-using MediaPipeUnityDots.Runtime.Interop;
 using MediaPipeUnityDots.Runtime.Input;
-using MediaPipeUnityDots.Runtime.Tracking;
-using Unity.Entities;
 using UnityEngine;
 
 namespace MediaPipeUnityDots.Runtime.Tracking
 {
     /// <summary>
-    /// WebCamTexture로부터 프레임을 캡처하고 HandTrackingService에 제출하는 런타임 프로바이더.
+    /// WebCamTexture로부터 프레임을 캡처하고 최신 픽셀·CaptureStamp를 제공한다. 추론은 하지 않는다.
     /// </summary>
-    public class WebcamFrameProvider : MonoBehaviour, IPointSource
+    public class WebcamFrameProvider : MonoBehaviour
     {
-        private const int LandmarkCapacity = 21;
-
         [SerializeField]
         private int _requestedWidth = 640;
         [SerializeField]
         private int _requestedHeight = 480;
         [SerializeField]
         private int _requestedFps = 30;
-        [SerializeField]
-        private int _numHands = 2;
-        [SerializeField]
-        private int _logIntervalFrames = 60;
-
-        /// <summary>
-        /// 추적할 손 수. HandTrackingService와 포인트 스포너가 공유한다.
-        /// </summary>
-        public int NumHands => Mathf.Clamp(_numHands, 1, MpudHandResult.MaxHands);
-        int IPointSource.MaxTargets => NumHands;
 
         /// <summary>
         /// Update에서 읽은 최신 raw 픽셀. 얼굴 등 다른 트래커와 웹캠을 공유한다.
@@ -53,24 +36,12 @@ namespace MediaPipeUnityDots.Runtime.Tracking
         public long CaptureClockUs => _captureClock.PeekTimestampUs();
 
         private WebCamTexture _webCamTexture;
-        private HandTrackingService _service;
         private Color32[] _pixelBuffer;
-        private MpudNormalizedLandmark[] _landmarkCopyBuffer;
-        private World _ecsWorld;
-        private Entity _singletonEntity;
         private readonly MonotonicTimestampGenerator _captureClock = new();
         private long _captureEpoch;
         private long _latestCaptureId;
         private long _latestCaptureTimestampUs;
         private bool _hasLoggedRuntimeMetadata;
-        private bool _hasLoggedFrameSummary;
-        private bool _lastLoggedFrameIsValid;
-        private int _lastLoggedFrameHandedness;
-        private int _lastLoggedFrameLandmarkCount;
-        private bool _pendingResetSnapshotPush;
-        private bool _hasLoggedOwnershipConflict;
-        private long _submitCount;
-        private long _lastCopiedTimestamp;
 
         private void OnEnable()
         {
@@ -93,19 +64,9 @@ namespace MediaPipeUnityDots.Runtime.Tracking
 
         private void Update()
         {
-            if (_webCamTexture == null || _service == null)
+            if (_webCamTexture == null)
             {
                 return;
-            }
-
-            if (_pendingResetSnapshotPush && TryGetEntityManager(out var resetEntityManager))
-            {
-                if (EnsureHandOwnership(resetEntityManager))
-                {
-                    HandTrackingSingletonUtil.WriteResetEmptyState(resetEntityManager, _singletonEntity);
-                }
-
-                _pendingResetSnapshotPush = false;
             }
 
             if (!_webCamTexture.didUpdateThisFrame)
@@ -140,54 +101,10 @@ namespace MediaPipeUnityDots.Runtime.Tracking
                     $"[MPUD] Webcam ready: {width}x{height} | mirrored={_webCamTexture.videoVerticallyMirrored} | rotation={_webCamTexture.videoRotationAngle} | flipVerticalSubmit={flipVertically}");
                 _hasLoggedRuntimeMetadata = true;
             }
-
-            var previousFrameCount = _service.LatestFrameCount;
-            _service.SubmitAndPoll(_pixelBuffer, width, height, flipVertically, new CaptureStamp(_latestCaptureId, _latestCaptureTimestampUs, _captureEpoch));
-
-            if (_service.LatestFrameCount == previousFrameCount)
-            {
-                return;
-            }
-
-            _submitCount++;
-            if (ShouldLogSubmit())
-            {
-                MpudLog.Log($"[MPUD] Submit #{_submitCount}, ts={_service.LatestTimestampUs}");
-            }
-
-            if (ShouldLogFrameSummary())
-            {
-                _hasLoggedFrameSummary = true;
-                _lastLoggedFrameIsValid = _service.LatestIsValid;
-                _lastLoggedFrameHandedness = _service.LatestHandedness;
-                _lastLoggedFrameLandmarkCount = _service.LatestLandmarkCount;
-
-                MpudLog.Log(
-                    $"[MPUD] Frame #{_service.LatestFrameCount} | Valid={_service.LatestIsValid} | Hands={_service.LatestHandCount} | Handedness={_service.LatestHandedness} | Score={_service.LatestScore:F2} | Landmarks={_service.LatestLandmarkCount} | ts={_service.LatestTimestampUs}");
-            }
-
-            if (!TryGetEntityManager(out var entityManager))
-            {
-                return;
-            }
-
-            if (_service.LatestTimestampUs <= _lastCopiedTimestamp)
-            {
-                return;
-            }
-
-            if (!EnsureHandOwnership(entityManager))
-            {
-                return;
-            }
-
-            PushLatestSnapshotToEcs(entityManager);
-            _lastCopiedTimestamp = _service.LatestTimestampUs;
         }
 
         private void OnDisable()
         {
-            WriteResetStateIfPossible();
             DisposeResources();
         }
 
@@ -195,59 +112,31 @@ namespace MediaPipeUnityDots.Runtime.Tracking
 
         private void InitializeResources()
         {
-            if (_webCamTexture != null || _service != null)
+            if (_webCamTexture != null)
             {
                 return;
             }
 
-            var modelPath = Path.Combine(
-                Application.streamingAssetsPath,
-                "MediaPipe",
-                "Models",
-                "hand_landmarker.task");
-            if (!File.Exists(modelPath))
-            {
-                throw new FileNotFoundException("hand_landmarker.task was not found.", modelPath);
-            }
             var devices = WebCamTexture.devices;
             if (devices == null || devices.Length == 0)
             {
                 throw new InvalidOperationException("No webcam devices were found.");
             }
 
-            _service = new HandTrackingService(modelPath, _numHands);
             _webCamTexture = new WebCamTexture(devices[0].name, _requestedWidth, _requestedHeight, _requestedFps);
             _webCamTexture.Play();
 
             _pixelBuffer = null;
-            _landmarkCopyBuffer = new MpudNormalizedLandmark[LandmarkCapacity];
-            _ecsWorld = null;
-            _singletonEntity = Entity.Null;
             _captureEpoch++;
             _latestCaptureId = 0;
             _latestCaptureTimestampUs = 0;
             _hasLoggedRuntimeMetadata = false;
-            _hasLoggedFrameSummary = false;
-            _lastLoggedFrameIsValid = false;
-            _lastLoggedFrameHandedness = -1;
-            _lastLoggedFrameLandmarkCount = 0;
-            _pendingResetSnapshotPush = false;
-            _submitCount = 0;
-            _lastCopiedTimestamp = 0;
-
-            TryGetEntityManager(out _);
 
             MpudLog.Log($"[MPUD] Webcam provider started with device '{devices[0].name}'.");
         }
 
         private void DisposeResources()
         {
-            if (_service != null)
-            {
-                _service.Dispose();
-                _service = null;
-            }
-
             if (_webCamTexture != null)
             {
                 if (_webCamTexture.isPlaying)
@@ -260,17 +149,7 @@ namespace MediaPipeUnityDots.Runtime.Tracking
             }
 
             _pixelBuffer = null;
-            _landmarkCopyBuffer = null;
-            _ecsWorld = null;
-            _singletonEntity = Entity.Null;
             _hasLoggedRuntimeMetadata = false;
-            _hasLoggedFrameSummary = false;
-            _lastLoggedFrameIsValid = false;
-            _lastLoggedFrameHandedness = -1;
-            _lastLoggedFrameLandmarkCount = 0;
-            _pendingResetSnapshotPush = false;
-            _submitCount = 0;
-            _lastCopiedTimestamp = 0;
         }
 
         /// <summary>
@@ -278,220 +157,12 @@ namespace MediaPipeUnityDots.Runtime.Tracking
         /// </summary>
         public WebCamTexture VideoTexture => _webCamTexture;
 
-        public void ResetTracker()
+        /// <summary>
+        /// tracker Reset 시 Depth 무효화를 위해 캡처 세대를 증가시킨다.
+        /// </summary>
+        public void BumpCaptureEpoch()
         {
-            if (_service == null)
-            {
-                return;
-            }
-
-            _service.ResetTracker();
             _captureEpoch++;
-            _pendingResetSnapshotPush = true;
-            // reset-empty 상태는 ts=0을 유지해야 다음 poll 결과가 dedupe를 통과한다.
-            _lastCopiedTimestamp = 0;
-        }
-
-        private void PushLatestSnapshotToEcs(EntityManager entityManager)
-        {
-            if (_service.LatestIsValid)
-            {
-                WriteValidPolledState(entityManager);
-                return;
-            }
-
-            HandTrackingSingletonUtil.WriteInvalidPolledState(
-                entityManager,
-                _singletonEntity,
-                _service.LatestTimestampUs,
-                _service.LatestFrameCount,
-                _service.LatestCaptureId,
-                _service.LatestCaptureTimestampUs,
-                _service.LatestCaptureEpoch);
-        }
-        private void WriteValidPolledState(EntityManager entityManager)
-        {
-            var handCount = _service.LatestHandCount;
-
-            var status = new HandTrackingStatus
-            {
-                IsValid = true,
-                HandCount = handCount,
-                Handedness = _service.LatestHandedness,
-                Score = _service.LatestScore,
-                LandmarkCount = _service.LatestLandmarkCount,
-                TimestampUs = _service.LatestTimestampUs,
-                FrameCount = _service.LatestFrameCount,
-                CaptureId = _service.LatestCaptureId,
-                CaptureTimestampUs = _service.LatestCaptureTimestampUs,
-                CaptureEpoch = _service.LatestCaptureEpoch,
-            };
-            status.HandednessList.Clear();
-            status.ScoreList.Clear();
-            for (var h = 0; h < handCount; h++)
-            {
-                status.HandednessList.Add(_service.GetLatestHandedness(h));
-                status.ScoreList.Add(_service.GetLatestScore(h));
-            }
-
-            entityManager.SetComponentData(_singletonEntity, status);
-            var landmarks = entityManager.GetBuffer<LandmarkElement>(_singletonEntity);
-            landmarks.ResizeUninitialized(handCount * LandmarkCapacity);
-
-            for (var h = 0; h < handCount; h++)
-            {
-                var copiedCount = _service.CopyLatestHandLandmarksTo(h, _landmarkCopyBuffer);
-                for (var i = 0; i < LandmarkCapacity; i++)
-                {
-                    var bufferIndex = h * LandmarkCapacity + i;
-                    if (i < copiedCount)
-                    {
-                        var source = _landmarkCopyBuffer[i];
-                        landmarks[bufferIndex] = new LandmarkElement
-                        {
-                            X = source.x,
-                            Y = source.y,
-                            Z = source.z,
-                            Visibility = source.visibility,
-                            Presence = source.presence,
-                            HandIndex = h,
-                        };
-                    }
-                    else
-                    {
-                        landmarks[bufferIndex] = new LandmarkElement { HandIndex = -1 };
-                    }
-                }
-            }
-
-            var world = entityManager.GetBuffer<HandWorldLandmarkElement>(_singletonEntity);
-            if (world.Length != handCount * LandmarkCapacity)
-            {
-                world.ResizeUninitialized(handCount * LandmarkCapacity);
-            }
-
-            for (var h = 0; h < handCount; h++)
-            {
-                var worldCount = _service.CopyLatestHandWorldLandmarksTo(h, _landmarkCopyBuffer);
-                for (var i = 0; i < LandmarkCapacity; i++)
-                {
-                    var bufferIndex = h * LandmarkCapacity + i;
-                    if (i < worldCount)
-                    {
-                        var source = _landmarkCopyBuffer[i];
-                        world[bufferIndex] = new HandWorldLandmarkElement
-                        {
-                            X = source.x,
-                            Y = source.y,
-                            Z = source.z,
-                            Visibility = source.visibility,
-                            HandIndex = h,
-                        };
-                    }
-                    else
-                    {
-                        world[bufferIndex] = new HandWorldLandmarkElement { HandIndex = -1 };
-                    }
-                }
-            }
-        }
-
-        private bool TryGetEntityManager(out EntityManager entityManager)
-        {
-            entityManager = default;
-
-            var defaultWorld = World.DefaultGameObjectInjectionWorld;
-            if (defaultWorld is not { IsCreated: true })
-            {
-                _ecsWorld = null;
-                _singletonEntity = Entity.Null;
-                return false;
-            }
-
-            if (_ecsWorld == null || _ecsWorld != defaultWorld || !_ecsWorld.IsCreated)
-            {
-                _ecsWorld = defaultWorld;
-                _singletonEntity = Entity.Null;
-            }
-
-            entityManager = _ecsWorld.EntityManager;
-            if (_singletonEntity == Entity.Null || !entityManager.Exists(_singletonEntity))
-            {
-                _singletonEntity = HandTrackingSingletonUtil.GetOrCreateSingleton(entityManager);
-                _hasLoggedOwnershipConflict = false;
-            }
-
-            return true;
-        }
-
-        private void WriteResetStateIfPossible()
-        {
-            if (!TryGetEntityManager(out var entityManager))
-            {
-                return;
-            }
-
-            var owner = OwnerRaw();
-            if (!TrackingWriterOwnershipUtil.IsOwner(entityManager, _singletonEntity, owner))
-            {
-                return;
-            }
-
-            HandTrackingSingletonUtil.WriteResetEmptyState(entityManager, _singletonEntity);
-            TrackingWriterOwnershipUtil.Release(entityManager, _singletonEntity, owner);
-        }
-
-        // 싱글턴 단일 작성자 보장. 다른 프로바이더 소유면 이번 프레임 기록을 건너뛴다.
-        private bool EnsureHandOwnership(EntityManager entityManager)
-        {
-            var owner = OwnerRaw();
-            if (TrackingWriterOwnershipUtil.IsOwner(entityManager, _singletonEntity, owner))
-            {
-                return true;
-            }
-
-            if (TrackingWriterOwnershipUtil.TryAcquire(entityManager, _singletonEntity, owner))
-            {
-                _hasLoggedOwnershipConflict = false;
-                return true;
-            }
-
-            if (!_hasLoggedOwnershipConflict)
-            {
-                _hasLoggedOwnershipConflict = true;
-                MpudLog.Warning("[MPUD] Hand 싱글턴이 다른 프로바이더 소유라 기록을 건너뛴다.");
-            }
-
-            return false;
-        }
-
-        private ulong OwnerRaw() => EntityId.ToULong(GetEntityId());
-
-        private bool ShouldLogSubmit()
-        {
-            if (!MpudLog.Enabled || _logIntervalFrames <= 0)
-            {
-                return false;
-            }
-
-            return _submitCount % _logIntervalFrames == 0;
-        }
-
-        private bool ShouldLogFrameSummary()
-        {
-            if (!_hasLoggedFrameSummary)
-            {
-                return true;
-            }
-
-            if (_service.LatestIsValid != _lastLoggedFrameIsValid
-                || _service.LatestHandedness != _lastLoggedFrameHandedness
-                || _service.LatestLandmarkCount != _lastLoggedFrameLandmarkCount)
-            {
-                return true;
-            }
-
-            return ShouldLogSubmit();
         }
     }
 }

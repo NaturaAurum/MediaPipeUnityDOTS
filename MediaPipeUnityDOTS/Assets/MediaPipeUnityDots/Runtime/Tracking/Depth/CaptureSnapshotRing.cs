@@ -85,6 +85,74 @@ namespace MediaPipeUnityDots.Runtime.Tracking
             _slots[slotIndex] = slot;
         }
 
+        public void UpsertHand(long captureId, long captureEpoch, int srcWidth, int srcHeight, int handCount, int[] handedness, float[] handXY)
+        {
+            if (captureId == 0)
+            {
+                return;
+            }
+
+            var slotIndex = FindOrAllocate(captureId, captureEpoch, srcWidth, srcHeight);
+            var slot = _slots[slotIndex];
+            slot.HandCount = Math.Max(0, Math.Min(handCount, MaxHands));
+            Array.Clear(slot.Handedness, 0, slot.Handedness.Length);
+            Array.Clear(slot.HandXY, 0, slot.HandXY.Length);
+            if (handedness != null && handXY != null)
+            {
+                Array.Copy(handedness, slot.Handedness, Math.Min(handedness.Length, slot.Handedness.Length));
+                Array.Copy(handXY, slot.HandXY, Math.Min(handXY.Length, slot.HandXY.Length));
+            }
+
+            _slots[slotIndex] = slot;
+        }
+
+        public void UpsertPose(long captureId, long captureEpoch, int srcWidth, int srcHeight, int poseCount, float[] poseXY)
+        {
+            if (captureId == 0)
+            {
+                return;
+            }
+
+            var slotIndex = FindOrAllocate(captureId, captureEpoch, srcWidth, srcHeight);
+            var slot = _slots[slotIndex];
+            slot.PoseCount = Math.Max(0, poseCount);
+            Array.Clear(slot.PoseXY, 0, slot.PoseXY.Length);
+            if (poseXY != null)
+            {
+                Array.Copy(poseXY, slot.PoseXY, Math.Min(poseXY.Length, slot.PoseXY.Length));
+            }
+
+            _slots[slotIndex] = slot;
+        }
+
+        private int FindOrAllocate(long captureId, long captureEpoch, int srcWidth, int srcHeight)
+        {
+            for (var i = 0; i < Capacity; i++)
+            {
+                if (_slots[i].CaptureId == captureId && _slots[i].CaptureEpoch == captureEpoch)
+                {
+                    return i;
+                }
+            }
+
+            var slotIndex = _next;
+            _next = (_next + 1) % Capacity;
+            _slots[slotIndex] = new Snapshot
+            {
+                CaptureId = captureId,
+                CaptureEpoch = captureEpoch,
+                SrcWidth = srcWidth,
+                SrcHeight = srcHeight,
+                Handedness = _slots[slotIndex].Handedness,
+                HandXY = _slots[slotIndex].HandXY,
+                PoseXY = _slots[slotIndex].PoseXY,
+            };
+            Array.Clear(_slots[slotIndex].Handedness, 0, _slots[slotIndex].Handedness.Length);
+            Array.Clear(_slots[slotIndex].HandXY, 0, _slots[slotIndex].HandXY.Length);
+            Array.Clear(_slots[slotIndex].PoseXY, 0, _slots[slotIndex].PoseXY.Length);
+            return slotIndex;
+        }
+
         public bool TryGet(long captureId, long captureEpoch, out Snapshot snapshot)
         {
             for (var i = 0; i < Capacity; i++)

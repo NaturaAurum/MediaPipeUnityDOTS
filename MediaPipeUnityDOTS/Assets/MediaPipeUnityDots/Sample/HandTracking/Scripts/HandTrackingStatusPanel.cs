@@ -15,7 +15,7 @@ namespace MediaPipeUnityDots.Sample.HandTracking.Scripts
         [SerializeField]
         private HandTrackingAdapter _adapter;
         [SerializeField]
-        private WebcamFrameProvider _provider;
+        private HandFrameProvider _provider;
         [SerializeField]
         private PanelRenderer _panelRenderer;
 

@@ -101,6 +101,26 @@ namespace MediaPipeUnityDots.Tests.EditMode
         }
 
         [Test]
+        public void HalfWeight_HalvesCorrection()
+        {
+            var full = new LandmarkDepthCorrection();
+            var half = new LandmarkDepthCorrection();
+            var fullSettings = Settings();
+            var halfSettings = Settings();
+            halfSettings.Weight = 0.5f;
+            LandmarkRender.UpdateDepthCorrection(ref full, true, 2f, 1000L, 1L, 0, fullSettings, out _, out _);
+            LandmarkRender.UpdateDepthCorrection(ref half, true, 2f, 1000L, 1L, 0, halfSettings, out _, out _);
+            LandmarkRender.UpdateDepthCorrection(ref full, true, 2.5f, 2000L, 1L, 0, fullSettings, out var fullCorrection, out _);
+            LandmarkRender.UpdateDepthCorrection(ref half, true, 2.5f, 2000L, 1L, 0, halfSettings, out var halfCorrection, out _);
+            Assert.AreEqual(fullCorrection * 0.5f, halfCorrection, 1e-6f);
+            LandmarkRender.UpdateDepthCorrection(ref half, true, 2.5f, 2000L, 1L, 0, halfSettings, out var repeated, out _);
+            Assert.AreEqual(halfCorrection, repeated, 1e-6f, "반복 렌더 프레임에서도 가중치를 유지한다.");
+            halfSettings.Weight = 0.25f;
+            LandmarkRender.UpdateDepthCorrection(ref half, true, 2.5f, 2000L, 1L, 0, halfSettings, out var adjusted, out _);
+            Assert.AreEqual(fullCorrection * 0.25f, adjusted, 1e-6f, "새 깊이 입력 없이도 가중치 변경이 반영된다.");
+        }
+
+        [Test]
         public void BackwardTimestamp_Rebaselines()
         {
             var state = new LandmarkDepthCorrection();

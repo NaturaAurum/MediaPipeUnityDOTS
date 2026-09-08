@@ -89,5 +89,31 @@ namespace MediaPipeUnityDots.Tests.EditMode
             _panel.BindToRoot(null);
             _panel.UnbindEvents();
         }
+
+        [Test]
+        public void StatusText_DistinguishesPipelineStates(
+            [Values(0, 1)] int enabled,
+            [Values(false, true)] bool found,
+            [Values(false, true)] bool valid,
+            [Values(0L, 7L)] long captureId)
+        {
+            var text = DepthSettingsPanel.StatusText(enabled, found, valid, captureId);
+            if (enabled == 0)
+            {
+                Assert.AreEqual("상태: 비활성", text);
+            }
+            else if (!found || captureId == 0)
+            {
+                Assert.AreEqual("상태: 대기 중", text);
+            }
+            else if (valid)
+            {
+                Assert.AreEqual("상태: 유효 capture #7", text);
+            }
+            else
+            {
+                Assert.AreEqual("상태: 대상 없음", text);
+            }
+        }
     }
 }

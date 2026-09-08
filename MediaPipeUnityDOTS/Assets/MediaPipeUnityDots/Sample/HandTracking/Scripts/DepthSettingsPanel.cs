@@ -214,6 +214,26 @@ namespace MediaPipeUnityDots.Sample.HandTracking.Scripts
             RefreshStatusLabel();
         }
 
+        private float _statusRefreshTimer;
+
+        // 상태 패널 선례를 따라 주기적으로 라벨만 갱신한다. 샘플 도착·만료를 뒤늦게 반영하기 위함이다.
+        private void LateUpdate()
+        {
+            if (_statusLabel == null)
+            {
+                return;
+            }
+
+            _statusRefreshTimer += Time.unscaledDeltaTime;
+            if (_statusRefreshTimer < 0.5f)
+            {
+                return;
+            }
+
+            _statusRefreshTimer = 0f;
+            RefreshStatusLabel();
+        }
+
         private void RefreshStatusLabel()
         {
             if (_statusLabel == null)
@@ -221,20 +241,23 @@ namespace MediaPipeUnityDots.Sample.HandTracking.Scripts
                 return;
             }
 
-            if (_settings.Enabled == 0)
+            var found = TryGetSampleSnapshot(out var valid, out var captureId);
+            _statusLabel.text = StatusText(_settings.Enabled, found, valid, captureId);
+        }
+
+        public static string StatusText(int enabled, bool found, bool valid, long captureId)
+        {
+            if (enabled == 0)
             {
-                _statusLabel.text = "상태: 비활성";
-                return;
+                return "상태: 비활성";
             }
 
-            if (TryGetSampleSnapshot(out var valid, out var captureId))
+            if (!found || captureId == 0)
             {
-                _statusLabel.text = valid ? $"상태: 유효 capture #{captureId}" : "상태: 샘플 없음";
+                return "상태: 대기 중";
             }
-            else
-            {
-                _statusLabel.text = "상태: 샘플 없음";
-            }
+
+            return valid ? $"상태: 유효 capture #{captureId}" : "상태: 대상 없음";
         }
 
         private void PushSettingsToEcs()

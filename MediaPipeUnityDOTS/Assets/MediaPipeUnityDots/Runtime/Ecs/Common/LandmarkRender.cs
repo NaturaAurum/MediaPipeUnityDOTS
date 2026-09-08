@@ -96,7 +96,7 @@ namespace MediaPipeUnityDots.Runtime.Ecs
 
             if (depthTimestampUs == state.LastDepthTimestampUs)
             {
-                correction = state.Filtered;
+                correction = state.Filtered * settings.Weight;
                 useCorrection = 1;
                 return;
             }
@@ -106,7 +106,7 @@ namespace MediaPipeUnityDots.Runtime.Ecs
             target = math.clamp(target, -settings.MaxOffset, settings.MaxOffset);
             // ponytail: 새 깊이 입력마다 0.5 추종(약 15Hz 입력에 2프레임 시정수). P2 평가에서 조정.
             state.Filtered += (target - state.Filtered) * 0.5f;
-            correction = state.Filtered;
+            correction = state.Filtered * settings.Weight;
             useCorrection = 1;
         }
 

@@ -43,6 +43,7 @@ namespace MediaPipeUnityDots.Runtime.Tracking
         private readonly float[] _poseXY = new float[CaptureSnapshotRing.PoseLandmarks * 2];
         private readonly float[] _sampleScratch = new float[CaptureSnapshotRing.PoseLandmarks];
         private long _lastSubmittedCaptureId;
+        private long _lastWebcamEpoch = -1;
         private long _submitCount;
         private long _completedCount;
         private long _droppedCount;
@@ -88,11 +89,26 @@ namespace MediaPipeUnityDots.Runtime.Tracking
                 return;
             }
 
+            var webcamEpoch = _webcamSource.CaptureEpoch;
+            if (_lastWebcamEpoch != webcamEpoch)
+            {
+                _service.Invalidate();
+                _publishedCaptureTimestampUs = 0;
+                _lastSubmittedCaptureId = 0;
+                _lastWebcamEpoch = webcamEpoch;
+            }
+
             ObserveSnapshots(entityManager);
             var settings = ReadSettings(entityManager);
             if (settings.Enabled == 0)
             {
+                if (_service.TryTakeCompleted(out _))
+                {
+                    _droppedCount++;
+                }
+
                 _service.Invalidate();
+                ClearPublishedSampleIfOwned(entityManager);
                 return;
             }
 
@@ -109,7 +125,7 @@ namespace MediaPipeUnityDots.Runtime.Tracking
                 PublishSample(entityManager, completed);
                 if (MpudLog.Enabled && _logIntervalFrames > 0 && _completedCount % _logIntervalFrames == 0)
                 {
-                    MpudLog.Log($"[MPUD] Depth #{_completedCount} | latency={completed.LatencyMs:F1}ms dropped={_droppedCount} expired={_expiredCount}");
+                    MpudLog.Log($"[MPUD] Depth #{_completedCount} | latency={completed.LatencyMs:F1}ms dropped={_droppedCount} expired={_expiredCount} rbFails={_service.ReadbackFailures}");
                 }
             }
         }
@@ -141,6 +157,7 @@ namespace MediaPipeUnityDots.Runtime.Tracking
             _ecsWorld = null;
             _singletonEntity = Entity.Null;
             _lastSubmittedCaptureId = 0;
+            _lastWebcamEpoch = -1;
             _submitCount = 0;
             _completedCount = 0;
             _droppedCount = 0;
@@ -195,24 +212,17 @@ namespace MediaPipeUnityDots.Runtime.Tracking
 
         private void ObserveSnapshots(EntityManager entityManager)
         {
-            var captureId = _webcamSource.LatestCaptureId;
-            if (captureId == 0)
-            {
-                return;
-            }
-
             var epoch = _webcamSource.CaptureEpoch;
             var srcWidth = _webcamSource.LatestPixelWidth;
             var srcHeight = _webcamSource.LatestPixelHeight;
-            var handCount = 0;
             if (_handQuery.CalculateEntityCount() == 1)
             {
                 var entity = _handQuery.GetSingletonEntity();
                 var status = entityManager.GetComponentData<HandTrackingStatus>(entity);
-                if (status.CaptureId == captureId && status.CaptureEpoch == epoch)
+                if (status.CaptureId != 0 && status.CaptureEpoch == epoch)
                 {
                     var buffer = entityManager.GetBuffer<LandmarkElement>(entity);
-                    handCount = Math.Min(status.HandCount, CaptureSnapshotRing.MaxHands);
+                    var handCount = Math.Min(status.HandCount, CaptureSnapshotRing.MaxHands);
                     for (var h = 0; h < handCount; h++)
                     {
                         _handedness[h] = h < status.HandednessList.Length ? status.HandednessList[h] : -1;
@@ -231,23 +241,24 @@ namespace MediaPipeUnityDots.Runtime.Tracking
                             _handXY[(h * CaptureSnapshotRing.HandLandmarks + i) * 2 + 1] = y;
                         }
                     }
+
+                    _ring.UpsertHand(status.CaptureId, epoch, srcWidth, srcHeight, handCount, _handedness, _handXY);
                 }
             }
 
-            var poseCount = 0;
             if (_poseQuery.CalculateEntityCount() == 1)
             {
                 var entity = _poseQuery.GetSingletonEntity();
                 var status = entityManager.GetComponentData<PoseTrackingStatus>(entity);
-                if (status.CaptureId == captureId && status.CaptureEpoch == epoch && status.PoseCount > 0)
+                if (status.CaptureId != 0 && status.CaptureEpoch == epoch)
                 {
                     var buffer = entityManager.GetBuffer<PoseLandmarkElement>(entity);
-                    poseCount = 1;
+                    var poseCount = status.PoseCount > 0 ? 1 : 0;
                     for (var i = 0; i < CaptureSnapshotRing.PoseLandmarks; i++)
                     {
                         var x = -1f;
                         var y = -1f;
-                        if (i < buffer.Length && buffer[i].PoseIndex == 0)
+                        if (poseCount > 0 && i < buffer.Length && buffer[i].PoseIndex == 0)
                         {
                             x = buffer[i].X;
                             y = buffer[i].Y;
@@ -256,10 +267,10 @@ namespace MediaPipeUnityDots.Runtime.Tracking
                         _poseXY[i * 2] = x;
                         _poseXY[i * 2 + 1] = y;
                     }
+
+                    _ring.UpsertPose(status.CaptureId, epoch, srcWidth, srcHeight, poseCount, _poseXY);
                 }
             }
-
-            _ring.Add(captureId, epoch, srcWidth, srcHeight, handCount, _handedness, _handXY, poseCount, _poseXY);
         }
 
         private void PublishSample(EntityManager entityManager, DepthInferenceService.CompletedMap completed)
@@ -344,6 +355,23 @@ namespace MediaPipeUnityDots.Runtime.Tracking
             return valid >= minValid && DepthSampler.TryMedian(_sampleScratch, valid, out representative);
         }
 
+        private void ClearPublishedSampleIfOwned(EntityManager entityManager)
+        {
+            if (_publishedCaptureTimestampUs == 0 || _singletonEntity == Entity.Null
+                || !entityManager.Exists(_singletonEntity))
+            {
+                _publishedCaptureTimestampUs = 0;
+                return;
+            }
+
+            if (TrackingWriterOwnershipUtil.IsOwner(entityManager, _singletonEntity, OwnerRaw()))
+            {
+                DepthSamplingSingletonUtil.WriteResetEmptyState(entityManager, _singletonEntity);
+            }
+
+            _publishedCaptureTimestampUs = 0;
+        }
+
         private void ExpirePublishedSample(EntityManager entityManager, DepthSettings settings)
         {
             if (_publishedCaptureTimestampUs == 0 || _singletonEntity == Entity.Null
@@ -407,6 +435,8 @@ namespace MediaPipeUnityDots.Runtime.Tracking
                 _ecsWorld = null;
                 _singletonEntity = Entity.Null;
                 DisposeQueries();
+                _service?.Invalidate();
+                _publishedCaptureTimestampUs = 0;
                 return false;
             }
 
@@ -415,6 +445,9 @@ namespace MediaPipeUnityDots.Runtime.Tracking
                 _ecsWorld = defaultWorld;
                 _singletonEntity = Entity.Null;
                 DisposeQueries();
+                _service?.Invalidate();
+                _publishedCaptureTimestampUs = 0;
+                _lastSubmittedCaptureId = 0;
             }
 
             entityManager = _ecsWorld.EntityManager;
@@ -450,10 +483,18 @@ namespace MediaPipeUnityDots.Runtime.Tracking
             }
 
             _queriesCreated = false;
+            // 파괴된 World가 쿼리도 해제하므로 그 핸들을 다시 Dispose하지 않는다.
+            if (_queryWorld is { IsCreated: true })
+            {
+                _handQuery.Dispose();
+                _poseQuery.Dispose();
+                _settingsQuery.Dispose();
+            }
+
             _queryWorld = null;
-            _handQuery.Dispose();
-            _poseQuery.Dispose();
-            _settingsQuery.Dispose();
+            _handQuery = default;
+            _poseQuery = default;
+            _settingsQuery = default;
         }
 
         private void WriteResetStateIfPossible()

@@ -38,6 +38,19 @@ namespace MediaPipeUnityDots.Runtime.Tracking
 
         public long FrameCount { get; private set; }
 
+        public long CaptureId { get; private set; }
+
+        public long CaptureTimestampUs { get; private set; }
+
+        public long CaptureEpoch { get; private set; }
+
+        internal void SetCaptureStamp(CaptureStamp stamp)
+        {
+            CaptureId = stamp.CaptureId;
+            CaptureTimestampUs = stamp.CaptureTimestampUs;
+            CaptureEpoch = stamp.CaptureEpoch;
+        }
+
         public int GetLandmarkCount(int face) => IsValidFace(face) ? _landmarkCounts[face] : 0;
 
         public int GetBlendshapeCount(int face) => IsValidFace(face) ? _blendshapeCounts[face] : 0;
@@ -193,6 +206,9 @@ namespace MediaPipeUnityDots.Runtime.Tracking
             FaceCount = 0;
             TimestampUs = 0;
             FrameCount = 0;
+            CaptureId = 0;
+            CaptureTimestampUs = 0;
+            CaptureEpoch = 0;
 
             for (var f = 0; f < MaxFaces; f++)
             {

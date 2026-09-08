@@ -12,22 +12,18 @@ namespace MediaPipeUnityDots.Runtime.Tracking
     /// </summary>
     public sealed class PoseTrackingService : IDisposable
     {
-        private const float MinDetectionConfidence = 0.5f;
-        private const float MinTrackingConfidence = 0.5f;
-
-        private readonly string _modelPath;
-        private readonly int _numPoses;
-        private readonly float _minDetectionConfidence;
-        private readonly float _minTrackingConfidence;
         private readonly PoseTrackingSnapshot _snapshot;
         private readonly MonotonicTimestampGenerator _timestampGenerator;
         private readonly SubmitStampMap _stampMap = new();
-
-        private IntPtr _trackerHandle;
-        private Color32[] _flipBuffer;
+        private readonly SubmitGate _submitGate = new();
+        private readonly TrackerWorker<MpudPoseResult> _worker;
         private bool _disposed;
 
-        public PoseTrackingService(string modelPath, int numPoses = 1, float minDetectionConfidence = 0.5f, float minTrackingConfidence = 0.5f)
+        public PoseTrackingService(
+            string modelPath,
+            int numPoses = 1,
+            float minDetectionConfidence = 0.5f,
+            float minTrackingConfidence = 0.5f)
         {
             if (string.IsNullOrWhiteSpace(modelPath))
             {
@@ -43,17 +39,15 @@ namespace MediaPipeUnityDots.Runtime.Tracking
                 numPoses = MpudPoseResult.MaxPoses;
             }
 
-            _modelPath = modelPath;
-            _numPoses = numPoses;
-            _minDetectionConfidence = minDetectionConfidence;
-            _minTrackingConfidence = minTrackingConfidence;
+            Debug.Assert(
+                Marshal.SizeOf<MpudPoseResult>() == MpudPoseResult.ExpectedSize,
+                "MpudPoseResult ABI mismatch with native bridge.");
             _snapshot = new PoseTrackingSnapshot();
             _timestampGenerator = new MonotonicTimestampGenerator();
-
-            CreateTracker();
+            _worker = new TrackerWorker<MpudPoseResult>(
+                "PoseTracker",
+                new PoseWorkerBody(modelPath, numPoses, minDetectionConfidence, minTrackingConfidence));
         }
-
-        public bool IsCreated => _trackerHandle != IntPtr.Zero;
 
         public bool LatestIsValid => _snapshot.IsValid;
 
@@ -72,18 +66,22 @@ namespace MediaPipeUnityDots.Runtime.Tracking
         public long LatestCaptureEpoch => _snapshot.CaptureEpoch;
 
         /// <summary>
-        /// 포즈 프레임을 제출하고 결과를 폴링한다.
-        /// flipVertically=true이면 내부 flip 버퍼에 상하 반전 후 submit.
-        /// submit 성공 시 즉시 poll하여 스냅샷을 갱신한다.
+        /// 새 캡처를 제출한다. 준비·유휴 상태이고 새로운 CaptureStamp일 때만 접수한다.
+        /// 호출자 픽셀은 워커 소유 슬롯에 복사한다.
         /// </summary>
-        public void SubmitAndPoll(Color32[] pixels, int width, int height, bool flipVertically, CaptureStamp stamp)
+        public bool TrySubmit(Color32[] pixels, int width, int height, bool flipVertically, CaptureStamp stamp)
         {
             ThrowIfDisposed();
 
-            if (!IsCreated)
+            // IsAccepting 확인 전에는 호출자 버퍼를 읽거나 복사하지 않는다.
+            if (!_worker.IsAccepting)
             {
-                MpudLog.Error("[MPUD] pose submit skipped because tracker is not created.");
-                return;
+                return false;
+            }
+
+            if (stamp.CaptureId == 0)
+            {
+                return false;
             }
 
             if (pixels == null)
@@ -107,72 +105,64 @@ namespace MediaPipeUnityDots.Runtime.Tracking
                 throw new ArgumentException("pixels length must match width * height.", nameof(pixels));
             }
 
-            var submitPixels = pixels;
-            if (flipVertically)
+            if (!_submitGate.Offer(stamp))
             {
-                EnsureFlipBuffer(pixelCount);
-                ImageFrameConverter.FlipVertical(pixels, _flipBuffer, width, height);
-                submitPixels = _flipBuffer;
+                return false;
             }
 
+            _submitGate.CopyInput(pixels, pixelCount);
             var submitTimestampUs = _timestampGenerator.NextTimestampUs();
+            var item = new TrackerWorkItem
+            {
+                Stamp = stamp,
+                Pixels = _submitGate.Input,
+                Width = width,
+                Height = height,
+                FlipVertically = flipVertically,
+                SubmitTimestampUs = submitTimestampUs,
+            };
+
+            if (!_worker.TrySubmit(in item))
+            {
+                _submitGate.Reset();
+                return false;
+            }
+
             _stampMap.Register(submitTimestampUs, stamp);
-
-            GCHandle pinnedHandle = default;
-            try
-            {
-                pinnedHandle = GCHandle.Alloc(submitPixels, GCHandleType.Pinned);
-                var frame = ImageFrameConverter.CreateFrame(
-                    pinnedHandle,
-                    width,
-                    height,
-                    submitTimestampUs);
-
-                var submitStatus = MpudPoseBridge.mpud_submit_pose_frame(_trackerHandle, ref frame);
-                if (submitStatus != MpudStatus.Ok)
-                {
-                    MpudLog.Error($"[MPUD] submit_pose_frame failed ({submitStatus}): {MpudPoseBridge.GetLastPoseError()}");
-                    return;
-                }
-            }
-            finally
-            {
-                if (pinnedHandle.IsAllocated)
-                {
-                    pinnedHandle.Free();
-                }
-            }
-
-            var pollStatus = MpudPoseBridge.mpud_try_get_latest_pose_result(_trackerHandle, out var result);
-            if (pollStatus == MpudStatus.Ok)
-            {
-                _snapshot.UpdateFrom(ref result);
-                _stampMap.TryTake(_snapshot.TimestampUs, out var resolved);
-                _snapshot.SetCaptureStamp(resolved);
-                return;
-            }
-
-            if (pollStatus == MpudStatus.NoResult)
-            {
-                MpudLog.Warning("[MPUD] try_get_latest_pose_result returned MPUD_NO_RESULT immediately after a successful submit.");
-                return;
-            }
-
-            MpudLog.Error($"[MPUD] try_get_latest_pose_result failed ({pollStatus}): {MpudPoseBridge.GetLastPoseError()}");
+            return true;
         }
 
         /// <summary>
-        /// 지정 포즈의 최신 landmark를 caller-owned destination에 복사한다.
+        /// 완료된 결과를 한 번만 가져온다. 오류 문자열은 워커에서 복사되어 메인에서 보고한다.
         /// </summary>
+        public bool TryTakeCompleted()
+        {
+            ThrowIfDisposed();
+
+            if (!_worker.TryTake(out var completion))
+            {
+                return false;
+            }
+
+            if (!completion.Ok)
+            {
+                MpudLog.Error(completion.Error ?? "[MPUD] pose worker failed.");
+                return false;
+            }
+
+            var result = completion.Result;
+            _snapshot.UpdateFrom(ref result);
+            _stampMap.TryTake(result.timestampUs, out var stamp);
+            _snapshot.SetCaptureStamp(stamp);
+            return true;
+        }
+
         public int CopyLatestPoseLandmarksTo(int pose, MpudNormalizedLandmark[] destination)
         {
             ThrowIfDisposed();
             return _snapshot.CopyPoseLandmarksTo(pose, destination);
         }
 
-        /// <summary>
-        /// 지정 포즈의 최신 월드 landmark(미터)를 caller-owned destination에 복사한다.
-        /// </summary>
         public int CopyLatestPoseWorldLandmarksTo(int pose, MpudNormalizedLandmark[] destination)
         {
             ThrowIfDisposed();
@@ -180,18 +170,16 @@ namespace MediaPipeUnityDots.Runtime.Tracking
         }
 
         /// <summary>
-        /// tracker를 destroy + recreate한다.
-        /// snapshot, timestampGen, flipBuffer를 모두 초기화한다.
+        /// 워커 세대를 먼저 무효화한 뒤 메인 스레드 스냅샷을 비운다.
         /// </summary>
         public void ResetTracker()
         {
             ThrowIfDisposed();
-            DestroyTracker();
+            _worker.RequestReset();
             _snapshot.ResetToEmpty();
             _stampMap.Clear();
+            _submitGate.Reset();
             _timestampGenerator.ResetForRecreate();
-            _flipBuffer = null;
-            CreateTracker();
         }
 
         public void Dispose()
@@ -201,58 +189,154 @@ namespace MediaPipeUnityDots.Runtime.Tracking
                 return;
             }
 
-            DestroyTracker();
             _disposed = true;
-            GC.SuppressFinalize(this);
+            _worker.Dispose();
+            if (_worker.ShutdownError != null)
+            {
+                MpudLog.Error($"[MPUD] pose worker shutdown: {_worker.ShutdownError}");
+            }
         }
 
-        private void CreateTracker()
+        // 네이티브 호출 전담. 모든 메서드는 워커 스레드에서 실행된다(Unity API 호출 금지).
+        private sealed class PoseWorkerBody : ITrackerWorkerBody<MpudPoseResult>
         {
-            Debug.Assert(
-                Marshal.SizeOf<MpudPoseResult>() == MpudPoseResult.ExpectedSize,
-                "MpudPoseResult ABI mismatch with native bridge.");
-            var modelPathNative = MarshalStringToUtf8(_modelPath);
-            try
-            {
-                var config = new MpudPoseTrackerConfig
-                {
-                    modelAssetPath = modelPathNative,
-                    numPoses = _numPoses,
-                    minDetectionConfidence = _minDetectionConfidence,
-                    minTrackingConfidence = _minTrackingConfidence,
-                };
+            private readonly string _modelPath;
+            private readonly int _numPoses;
+            private readonly float _minDetectionConfidence;
+            private readonly float _minTrackingConfidence;
+            private IntPtr _trackerHandle;
+            private Color32[] _flipBuffer;
 
-                var createStatus = MpudPoseBridge.mpud_create_pose_tracker(ref config, out var trackerHandle);
-                if (createStatus != MpudStatus.Ok)
+            public PoseWorkerBody(string modelPath, int numPoses, float minDetectionConfidence, float minTrackingConfidence)
+            {
+                _modelPath = modelPath;
+                _numPoses = numPoses;
+                _minDetectionConfidence = minDetectionConfidence;
+                _minTrackingConfidence = minTrackingConfidence;
+            }
+
+            public void Create()
+            {
+                var modelPathNative = MarshalStringToUtf8(_modelPath);
+                try
                 {
-                    throw new InvalidOperationException($"[MPUD] create_pose_tracker failed ({createStatus}): {MpudPoseBridge.GetLastPoseError()}");
+                    var config = new MpudPoseTrackerConfig
+                    {
+                        modelAssetPath = modelPathNative,
+                        numPoses = _numPoses,
+                        minDetectionConfidence = _minDetectionConfidence,
+                        minTrackingConfidence = _minTrackingConfidence,
+                    };
+
+                    var createStatus = MpudPoseBridge.mpud_create_pose_tracker(ref config, out var trackerHandle);
+                    if (createStatus != MpudStatus.Ok)
+                    {
+                        throw new InvalidOperationException(
+                            $"[MPUD] create_pose_tracker failed ({createStatus}): {MpudPoseBridge.GetLastPoseError()}");
+                    }
+
+                    _trackerHandle = trackerHandle;
+                }
+                finally
+                {
+                    Marshal.FreeHGlobal(modelPathNative);
+                }
+            }
+
+            public bool Invoke(in TrackerWorkItem item, out MpudPoseResult completed, out string error)
+            {
+                completed = default;
+                error = null;
+
+                var pixelCount = checked(item.Width * item.Height);
+                if (item.Pixels == null || item.Pixels.Length < pixelCount)
+                {
+                    error = "[MPUD] pose submit skipped: invalid input buffer.";
+                    return false;
                 }
 
-                _trackerHandle = trackerHandle;
-                _snapshot.ResetToEmpty();
-            }
-            finally
-            {
-                Marshal.FreeHGlobal(modelPathNative);
-            }
-        }
+                var submitPixels = item.Pixels;
+                if (item.FlipVertically)
+                {
+                    if (_flipBuffer == null || _flipBuffer.Length != pixelCount)
+                    {
+                        _flipBuffer = new Color32[pixelCount];
+                    }
 
-        private void DestroyTracker()
-        {
-            if (_trackerHandle == IntPtr.Zero)
-            {
-                return;
+                    ImageFrameConverter.FlipVertical(item.Pixels, _flipBuffer, item.Width, item.Height);
+                    submitPixels = _flipBuffer;
+                }
+
+                GCHandle pinnedHandle = default;
+                try
+                {
+                    pinnedHandle = GCHandle.Alloc(submitPixels, GCHandleType.Pinned);
+                    var frame = ImageFrameConverter.CreateFrame(
+                        pinnedHandle,
+                        item.Width,
+                        item.Height,
+                        item.SubmitTimestampUs);
+
+                    var submitStatus = MpudPoseBridge.mpud_submit_pose_frame(_trackerHandle, ref frame);
+                    if (submitStatus != MpudStatus.Ok)
+                    {
+                        error = $"[MPUD] submit_pose_frame failed ({submitStatus}): {MpudPoseBridge.GetLastPoseError()}";
+                        return false;
+                    }
+                }
+                finally
+                {
+                    if (pinnedHandle.IsAllocated)
+                    {
+                        pinnedHandle.Free();
+                    }
+                }
+
+                var pollStatus = MpudPoseBridge.mpud_try_get_latest_pose_result(_trackerHandle, out var result);
+                if (pollStatus == MpudStatus.Ok)
+                {
+                    completed = result;
+                    return true;
+                }
+
+                if (pollStatus != MpudStatus.NoResult)
+                {
+                    error = $"[MPUD] try_get_latest_pose_result failed ({pollStatus}): {MpudPoseBridge.GetLastPoseError()}";
+                }
+
+                return false;
             }
 
-            MpudPoseBridge.mpud_destroy_pose_tracker(_trackerHandle);
-            _trackerHandle = IntPtr.Zero;
-        }
-
-        private void EnsureFlipBuffer(int pixelCount)
-        {
-            if (_flipBuffer == null || _flipBuffer.Length != pixelCount)
+            public void ResetBody()
             {
-                _flipBuffer = new Color32[pixelCount];
+                DestroyTracker();
+                _flipBuffer = null;
+                Create();
+            }
+
+            public void Destroy()
+            {
+                DestroyTracker();
+            }
+
+            private void DestroyTracker()
+            {
+                if (_trackerHandle == IntPtr.Zero)
+                {
+                    return;
+                }
+
+                MpudPoseBridge.mpud_destroy_pose_tracker(_trackerHandle);
+                _trackerHandle = IntPtr.Zero;
+            }
+
+            private static IntPtr MarshalStringToUtf8(string value)
+            {
+                var bytes = System.Text.Encoding.UTF8.GetBytes(value);
+                var ptr = Marshal.AllocHGlobal(bytes.Length + 1);
+                Marshal.Copy(bytes, 0, ptr, bytes.Length);
+                Marshal.WriteByte(ptr, bytes.Length, 0);
+                return ptr;
             }
         }
 
@@ -262,15 +346,6 @@ namespace MediaPipeUnityDots.Runtime.Tracking
             {
                 throw new ObjectDisposedException(nameof(PoseTrackingService));
             }
-        }
-
-        private static IntPtr MarshalStringToUtf8(string value)
-        {
-            var bytes = System.Text.Encoding.UTF8.GetBytes(value);
-            var ptr = Marshal.AllocHGlobal(bytes.Length + 1);
-            Marshal.Copy(bytes, 0, ptr, bytes.Length);
-            Marshal.WriteByte(ptr, bytes.Length, 0);
-            return ptr;
         }
     }
 }

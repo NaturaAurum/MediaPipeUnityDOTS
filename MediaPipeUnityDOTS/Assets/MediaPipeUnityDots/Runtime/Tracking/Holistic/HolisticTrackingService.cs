@@ -12,37 +12,32 @@ namespace MediaPipeUnityDots.Runtime.Tracking
     /// </summary>
     public sealed class HolisticTrackingService : IDisposable
     {
-        private const float MinDetectionConfidence = 0.5f;
-        private const float MinPresenceConfidence = 0.5f;
-
-        private readonly string _modelPath;
-        private readonly float _minDetectionConfidence;
-        private readonly float _minPresenceConfidence;
         private readonly HolisticTrackingSnapshot _snapshot;
         private readonly MonotonicTimestampGenerator _timestampGenerator;
         private readonly SubmitStampMap _stampMap = new();
-
-        private IntPtr _trackerHandle;
-        private Color32[] _flipBuffer;
+        private readonly SubmitGate _submitGate = new();
+        private readonly TrackerWorker<MpudHolisticResult> _worker;
         private bool _disposed;
 
-        public HolisticTrackingService(string modelPath, float minDetectionConfidence = 0.5f, float minPresenceConfidence = 0.5f)
+        public HolisticTrackingService(
+            string modelPath,
+            float minDetectionConfidence = 0.5f,
+            float minPresenceConfidence = 0.5f)
         {
             if (string.IsNullOrWhiteSpace(modelPath))
             {
                 throw new ArgumentException("modelPath must not be null or empty.", nameof(modelPath));
             }
 
-            _modelPath = modelPath;
-            _minDetectionConfidence = minDetectionConfidence;
-            _minPresenceConfidence = minPresenceConfidence;
+            Debug.Assert(
+                Marshal.SizeOf<MpudHolisticResult>() == MpudHolisticResult.ExpectedSize,
+                "MpudHolisticResult ABI mismatch with native bridge.");
             _snapshot = new HolisticTrackingSnapshot();
             _timestampGenerator = new MonotonicTimestampGenerator();
-
-            CreateTracker();
+            _worker = new TrackerWorker<MpudHolisticResult>(
+                "HolisticTracker",
+                new HolisticWorkerBody(modelPath, minDetectionConfidence, minPresenceConfidence));
         }
-
-        public bool IsCreated => _trackerHandle != IntPtr.Zero;
 
         public bool LatestIsValid => _snapshot.IsValid;
 
@@ -65,18 +60,22 @@ namespace MediaPipeUnityDots.Runtime.Tracking
         public long LatestCaptureEpoch => _snapshot.CaptureEpoch;
 
         /// <summary>
-        /// 프레임을 제출하고 결과를 폴링한다.
-        /// flipVertically=true이면 내부 flip 버퍼에 상하 반전 후 submit.
-        /// submit 성공 시 즉시 poll하여 스냅샷을 갱신한다.
+        /// 새 캡처를 제출한다. 준비·유휴 상태이고 새로운 CaptureStamp일 때만 접수한다.
+        /// 호출자 픽셀은 워커 소유 슬롯에 복사한다.
         /// </summary>
-        public void SubmitAndPoll(Color32[] pixels, int width, int height, bool flipVertically, CaptureStamp stamp)
+        public bool TrySubmit(Color32[] pixels, int width, int height, bool flipVertically, CaptureStamp stamp)
         {
             ThrowIfDisposed();
 
-            if (!IsCreated)
+            // IsAccepting 확인 전에는 호출자 버퍼를 읽거나 복사하지 않는다.
+            if (!_worker.IsAccepting)
             {
-                MpudLog.Error("[MPUD] holistic submit skipped because tracker is not created.");
-                return;
+                return false;
+            }
+
+            if (stamp.CaptureId == 0)
+            {
+                return false;
             }
 
             if (pixels == null)
@@ -100,58 +99,56 @@ namespace MediaPipeUnityDots.Runtime.Tracking
                 throw new ArgumentException("pixels length must match width * height.", nameof(pixels));
             }
 
-            var submitPixels = pixels;
-            if (flipVertically)
+            if (!_submitGate.Offer(stamp))
             {
-                EnsureFlipBuffer(pixelCount);
-                ImageFrameConverter.FlipVertical(pixels, _flipBuffer, width, height);
-                submitPixels = _flipBuffer;
+                return false;
             }
 
+            _submitGate.CopyInput(pixels, pixelCount);
             var submitTimestampUs = _timestampGenerator.NextTimestampUs();
+            var item = new TrackerWorkItem
+            {
+                Stamp = stamp,
+                Pixels = _submitGate.Input,
+                Width = width,
+                Height = height,
+                FlipVertically = flipVertically,
+                SubmitTimestampUs = submitTimestampUs,
+            };
+
+            if (!_worker.TrySubmit(in item))
+            {
+                _submitGate.Reset();
+                return false;
+            }
+
             _stampMap.Register(submitTimestampUs, stamp);
+            return true;
+        }
 
-            GCHandle pinnedHandle = default;
-            try
-            {
-                pinnedHandle = GCHandle.Alloc(submitPixels, GCHandleType.Pinned);
-                var frame = ImageFrameConverter.CreateFrame(
-                    pinnedHandle,
-                    width,
-                    height,
-                    submitTimestampUs);
+        /// <summary>
+        /// 완료된 결과를 한 번만 가져온다. 오류 문자열은 워커에서 복사되어 메인에서 보고한다.
+        /// </summary>
+        public bool TryTakeCompleted()
+        {
+            ThrowIfDisposed();
 
-                var submitStatus = MpudHolisticBridge.mpud_submit_holistic_frame(_trackerHandle, ref frame);
-                if (submitStatus != MpudStatus.Ok)
-                {
-                    MpudLog.Error($"[MPUD] submit_holistic_frame failed ({submitStatus}): {MpudHolisticBridge.GetLastHolisticError()}");
-                    return;
-                }
-            }
-            finally
+            if (!_worker.TryTake(out var completion))
             {
-                if (pinnedHandle.IsAllocated)
-                {
-                    pinnedHandle.Free();
-                }
+                return false;
             }
 
-            var pollStatus = MpudHolisticBridge.mpud_try_get_latest_holistic_result(_trackerHandle, out var result);
-            if (pollStatus == MpudStatus.Ok)
+            if (!completion.Ok)
             {
-                _snapshot.UpdateFrom(ref result);
-                _stampMap.TryTake(_snapshot.TimestampUs, out var resolved);
-                _snapshot.SetCaptureStamp(resolved);
-                return;
+                MpudLog.Error(completion.Error ?? "[MPUD] holistic worker failed.");
+                return false;
             }
 
-            if (pollStatus == MpudStatus.NoResult)
-            {
-                MpudLog.Warning("[MPUD] try_get_latest_holistic_result returned MPUD_NO_RESULT immediately after a successful submit.");
-                return;
-            }
-
-            MpudLog.Error($"[MPUD] try_get_latest_holistic_result failed ({pollStatus}): {MpudHolisticBridge.GetLastHolisticError()}");
+            var result = completion.Result;
+            _snapshot.UpdateFrom(ref result);
+            _stampMap.TryTake(result.timestampUs, out var stamp);
+            _snapshot.SetCaptureStamp(stamp);
+            return true;
         }
 
         public int CopyLatestFaceTo(MpudNormalizedLandmark[] destination)
@@ -197,18 +194,16 @@ namespace MediaPipeUnityDots.Runtime.Tracking
         }
 
         /// <summary>
-        /// tracker를 destroy + recreate한다.
-        /// snapshot, timestampGen, flipBuffer를 모두 초기화한다.
+        /// 워커 세대를 먼저 무효화한 뒤 메인 스레드 스냅샷을 비운다.
         /// </summary>
         public void ResetTracker()
         {
             ThrowIfDisposed();
-            DestroyTracker();
+            _worker.RequestReset();
             _snapshot.ResetToEmpty();
             _stampMap.Clear();
+            _submitGate.Reset();
             _timestampGenerator.ResetForRecreate();
-            _flipBuffer = null;
-            CreateTracker();
         }
 
         public void Dispose()
@@ -218,57 +213,151 @@ namespace MediaPipeUnityDots.Runtime.Tracking
                 return;
             }
 
-            DestroyTracker();
             _disposed = true;
-            GC.SuppressFinalize(this);
+            _worker.Dispose();
+            if (_worker.ShutdownError != null)
+            {
+                MpudLog.Error($"[MPUD] holistic worker shutdown: {_worker.ShutdownError}");
+            }
         }
 
-        private void CreateTracker()
+        // 네이티브 호출 전담. 모든 메서드는 워커 스레드에서 실행된다(Unity API 호출 금지).
+        private sealed class HolisticWorkerBody : ITrackerWorkerBody<MpudHolisticResult>
         {
-            Debug.Assert(
-                Marshal.SizeOf<MpudHolisticResult>() == MpudHolisticResult.ExpectedSize,
-                "MpudHolisticResult ABI mismatch with native bridge.");
-            var modelPathNative = MarshalStringToUtf8(_modelPath);
-            try
-            {
-                var config = new MpudHolisticTrackerConfig
-                {
-                    modelAssetPath = modelPathNative,
-                    minDetectionConfidence = _minDetectionConfidence,
-                    minPresenceConfidence = _minPresenceConfidence,
-                };
+            private readonly string _modelPath;
+            private readonly float _minDetectionConfidence;
+            private readonly float _minPresenceConfidence;
+            private IntPtr _trackerHandle;
+            private Color32[] _flipBuffer;
 
-                var createStatus = MpudHolisticBridge.mpud_create_holistic_tracker(ref config, out var trackerHandle);
-                if (createStatus != MpudStatus.Ok)
+            public HolisticWorkerBody(string modelPath, float minDetectionConfidence, float minPresenceConfidence)
+            {
+                _modelPath = modelPath;
+                _minDetectionConfidence = minDetectionConfidence;
+                _minPresenceConfidence = minPresenceConfidence;
+            }
+
+            public void Create()
+            {
+                var modelPathNative = MarshalStringToUtf8(_modelPath);
+                try
                 {
-                    throw new InvalidOperationException($"[MPUD] create_holistic_tracker failed ({createStatus}): {MpudHolisticBridge.GetLastHolisticError()}");
+                    var config = new MpudHolisticTrackerConfig
+                    {
+                        modelAssetPath = modelPathNative,
+                        minDetectionConfidence = _minDetectionConfidence,
+                        minPresenceConfidence = _minPresenceConfidence,
+                    };
+
+                    var createStatus = MpudHolisticBridge.mpud_create_holistic_tracker(ref config, out var trackerHandle);
+                    if (createStatus != MpudStatus.Ok)
+                    {
+                        throw new InvalidOperationException(
+                            $"[MPUD] create_holistic_tracker failed ({createStatus}): {MpudHolisticBridge.GetLastHolisticError()}");
+                    }
+
+                    _trackerHandle = trackerHandle;
+                }
+                finally
+                {
+                    Marshal.FreeHGlobal(modelPathNative);
+                }
+            }
+
+            public bool Invoke(in TrackerWorkItem item, out MpudHolisticResult completed, out string error)
+            {
+                completed = default;
+                error = null;
+
+                var pixelCount = checked(item.Width * item.Height);
+                if (item.Pixels == null || item.Pixels.Length < pixelCount)
+                {
+                    error = "[MPUD] holistic submit skipped: invalid input buffer.";
+                    return false;
                 }
 
-                _trackerHandle = trackerHandle;
-                _snapshot.ResetToEmpty();
-            }
-            finally
-            {
-                Marshal.FreeHGlobal(modelPathNative);
-            }
-        }
+                var submitPixels = item.Pixels;
+                if (item.FlipVertically)
+                {
+                    if (_flipBuffer == null || _flipBuffer.Length != pixelCount)
+                    {
+                        _flipBuffer = new Color32[pixelCount];
+                    }
 
-        private void DestroyTracker()
-        {
-            if (_trackerHandle == IntPtr.Zero)
-            {
-                return;
+                    ImageFrameConverter.FlipVertical(item.Pixels, _flipBuffer, item.Width, item.Height);
+                    submitPixels = _flipBuffer;
+                }
+
+                GCHandle pinnedHandle = default;
+                try
+                {
+                    pinnedHandle = GCHandle.Alloc(submitPixels, GCHandleType.Pinned);
+                    var frame = ImageFrameConverter.CreateFrame(
+                        pinnedHandle,
+                        item.Width,
+                        item.Height,
+                        item.SubmitTimestampUs);
+
+                    var submitStatus = MpudHolisticBridge.mpud_submit_holistic_frame(_trackerHandle, ref frame);
+                    if (submitStatus != MpudStatus.Ok)
+                    {
+                        error = $"[MPUD] submit_holistic_frame failed ({submitStatus}): {MpudHolisticBridge.GetLastHolisticError()}";
+                        return false;
+                    }
+                }
+                finally
+                {
+                    if (pinnedHandle.IsAllocated)
+                    {
+                        pinnedHandle.Free();
+                    }
+                }
+
+                var pollStatus = MpudHolisticBridge.mpud_try_get_latest_holistic_result(_trackerHandle, out var result);
+                if (pollStatus == MpudStatus.Ok)
+                {
+                    completed = result;
+                    return true;
+                }
+
+                if (pollStatus != MpudStatus.NoResult)
+                {
+                    error = $"[MPUD] try_get_latest_holistic_result failed ({pollStatus}): {MpudHolisticBridge.GetLastHolisticError()}";
+                }
+
+                return false;
             }
 
-            MpudHolisticBridge.mpud_destroy_holistic_tracker(_trackerHandle);
-            _trackerHandle = IntPtr.Zero;
-        }
-
-        private void EnsureFlipBuffer(int pixelCount)
-        {
-            if (_flipBuffer == null || _flipBuffer.Length != pixelCount)
+            public void ResetBody()
             {
-                _flipBuffer = new Color32[pixelCount];
+                DestroyTracker();
+                _flipBuffer = null;
+                Create();
+            }
+
+            public void Destroy()
+            {
+                DestroyTracker();
+            }
+
+            private void DestroyTracker()
+            {
+                if (_trackerHandle == IntPtr.Zero)
+                {
+                    return;
+                }
+
+                MpudHolisticBridge.mpud_destroy_holistic_tracker(_trackerHandle);
+                _trackerHandle = IntPtr.Zero;
+            }
+
+            private static IntPtr MarshalStringToUtf8(string value)
+            {
+                var bytes = System.Text.Encoding.UTF8.GetBytes(value);
+                var ptr = Marshal.AllocHGlobal(bytes.Length + 1);
+                Marshal.Copy(bytes, 0, ptr, bytes.Length);
+                Marshal.WriteByte(ptr, bytes.Length, 0);
+                return ptr;
             }
         }
 
@@ -278,15 +367,6 @@ namespace MediaPipeUnityDots.Runtime.Tracking
             {
                 throw new ObjectDisposedException(nameof(HolisticTrackingService));
             }
-        }
-
-        private static IntPtr MarshalStringToUtf8(string value)
-        {
-            var bytes = System.Text.Encoding.UTF8.GetBytes(value);
-            var ptr = Marshal.AllocHGlobal(bytes.Length + 1);
-            Marshal.Copy(bytes, 0, ptr, bytes.Length);
-            Marshal.WriteByte(ptr, bytes.Length, 0);
-            return ptr;
         }
     }
 }

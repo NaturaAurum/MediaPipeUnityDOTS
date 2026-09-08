@@ -35,6 +35,22 @@ namespace MediaPipeUnityDots.Tests.EditMode
         }
 
         [Test]
+        public void Upsert_MergesHandAndPose()
+        {
+            var ring = new CaptureSnapshotRing();
+            var handXY = new float[84];
+            handXY[0] = 0.5f;
+            ring.UpsertHand(7L, 1L, 640, 480, 1, new[] { 0, -1 }, handXY);
+            ring.UpsertPose(7L, 1L, 640, 480, 1, new float[66]);
+            Assert.IsTrue(ring.TryGet(7L, 1L, out var hit));
+            Assert.AreEqual(1, hit.HandCount);
+            Assert.AreEqual(1, hit.PoseCount);
+            Assert.AreEqual(0.5f, hit.HandXY[0], 1e-6f);
+            ring.UpsertHand(0L, 1L, 640, 480, 1, new[] { 0, -1 }, handXY);
+            Assert.IsFalse(ring.TryGet(0L, 1L, out _));
+        }
+
+        [Test]
         public void Gate_Boundaries()
         {
             Assert.IsTrue(DepthSampleGate.IsStamped(1L));
