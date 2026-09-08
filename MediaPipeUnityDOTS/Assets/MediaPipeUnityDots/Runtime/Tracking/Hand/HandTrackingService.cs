@@ -17,14 +17,11 @@ namespace MediaPipeUnityDots.Runtime.Tracking
         private const float MinTrackingConfidence = 0.5f;
         private const int RunningModeVideo = 1;
 
-        private readonly string _modelPath;
-        private readonly int _numHands;
         private readonly HandTrackingSnapshot _snapshot;
         private readonly MonotonicTimestampGenerator _timestampGenerator;
         private readonly SubmitStampMap _stampMap = new();
-
-        private IntPtr _trackerHandle;
-        private Color32[] _flipBuffer;
+        private readonly SubmitGate _submitGate = new();
+        private readonly TrackerWorker<MpudHandResult> _worker;
         private bool _disposed;
 
         public HandTrackingService(string modelPath, int numHands = 2)
@@ -43,15 +40,13 @@ namespace MediaPipeUnityDots.Runtime.Tracking
                 numHands = MpudHandResult.MaxHands;
             }
 
-            _modelPath = modelPath;
-            _numHands = numHands;
+            Debug.Assert(
+                Marshal.SizeOf<MpudHandResult>() == MpudHandResult.ExpectedSize,
+                "MpudHandResult ABI mismatch with native bridge.");
             _snapshot = new HandTrackingSnapshot();
             _timestampGenerator = new MonotonicTimestampGenerator();
-
-            CreateAndStartTracker();
+            _worker = new TrackerWorker<MpudHandResult>("HandTracker", new HandWorkerBody(modelPath, numHands));
         }
-
-        public bool IsCreated => _trackerHandle != IntPtr.Zero;
 
         public bool LatestIsValid => _snapshot.IsValid;
 
@@ -80,18 +75,16 @@ namespace MediaPipeUnityDots.Runtime.Tracking
         public int GetLatestLandmarkCount(int hand) => _snapshot.GetLandmarkCount(hand);
 
         /// <summary>
-        /// 웹캠 프레임을 제출하고 결과를 폴링한다.
-        /// flipVertically=true이면 내부 flip 버퍼에 상하 반전 후 submit.
-        /// submit 성공 시 즉시 poll하여 스냅샷을 갱신한다.
+        /// 새 캡처를 제출한다. 중복 캡처·미생성 시 false. 호출자 버퍼는 소유 슬롯에 복사된다.
+        /// flipVertically=true이면 소유 슬롯에서 상하 반전 후 submit.
         /// </summary>
-        public void SubmitAndPoll(Color32[] pixels, int width, int height, bool flipVertically, CaptureStamp stamp)
+        public bool TrySubmit(Color32[] pixels, int width, int height, bool flipVertically, CaptureStamp stamp)
         {
             ThrowIfDisposed();
 
-            if (!IsCreated)
+            if (!_worker.IsAccepting)
             {
-                MpudLog.Error("[MPUD] submit skipped because tracker is not created.");
-                return;
+                return false;
             }
 
             if (pixels == null)
@@ -115,58 +108,57 @@ namespace MediaPipeUnityDots.Runtime.Tracking
                 throw new ArgumentException("pixels length must match width * height.", nameof(pixels));
             }
 
-            var submitPixels = pixels;
-            if (flipVertically)
+            if (!_submitGate.Offer(stamp))
             {
-                EnsureFlipBuffer(pixelCount);
-                ImageFrameConverter.FlipVertical(pixels, _flipBuffer, width, height);
-                submitPixels = _flipBuffer;
+                return false;
             }
+
+            _submitGate.CopyInput(pixels, pixelCount);
 
             var submitTimestampUs = _timestampGenerator.NextTimestampUs();
             _stampMap.Register(submitTimestampUs, stamp);
 
-            GCHandle pinnedHandle = default;
-            try
+            var item = new TrackerWorkItem
             {
-                pinnedHandle = GCHandle.Alloc(submitPixels, GCHandleType.Pinned);
-                var frame = ImageFrameConverter.CreateFrame(
-                    pinnedHandle,
-                    width,
-                    height,
-                    submitTimestampUs);
-
-                var submitStatus = MpudBridge.mpud_submit_frame(_trackerHandle, ref frame);
-                if (submitStatus != MpudStatus.Ok)
-                {
-                    MpudLog.Error($"[MPUD] submit_frame failed ({submitStatus}): {MpudBridge.GetLastError()}");
-                    return;
-                }
-            }
-            finally
+                Stamp = stamp,
+                Pixels = _submitGate.Input,
+                Width = width,
+                Height = height,
+                FlipVertically = flipVertically,
+                SubmitTimestampUs = submitTimestampUs,
+            };
+            if (!_worker.TrySubmit(in item))
             {
-                if (pinnedHandle.IsAllocated)
-                {
-                    pinnedHandle.Free();
-                }
+                _submitGate.Reset();
+                return false;
             }
 
-            var pollStatus = MpudBridge.mpud_try_get_latest_result(_trackerHandle, out var result);
-            if (pollStatus == MpudStatus.Ok)
+            return true;
+        }
+
+        /// <summary>
+        /// 완료된 결과를 한 번만 가져온다. 새 프레임이 poll되면 true.
+        /// </summary>
+        public bool TryTakeCompleted()
+        {
+            ThrowIfDisposed();
+
+            if (!_worker.TryTake(out var completion))
             {
-                _snapshot.UpdateFrom(ref result);
-                _stampMap.TryTake(_snapshot.TimestampUs, out var resolved);
-                _snapshot.SetCaptureStamp(resolved);
-                return;
+                return false;
             }
 
-            if (pollStatus == MpudStatus.NoResult)
+            if (!completion.Ok)
             {
-                MpudLog.Warning("[MPUD] try_get_latest_result returned MPUD_NO_RESULT immediately after a successful submit.");
-                return;
+                MpudLog.Error(completion.Error);
+                return false;
             }
 
-            MpudLog.Error($"[MPUD] try_get_latest_result failed ({pollStatus}): {MpudBridge.GetLastError()}");
+            var result = completion.Result;
+            _snapshot.UpdateFrom(ref result);
+            _stampMap.TryTake(_snapshot.TimestampUs, out var resolved);
+            _snapshot.SetCaptureStamp(resolved);
+            return true;
         }
 
         /// <summary>
@@ -206,12 +198,10 @@ namespace MediaPipeUnityDots.Runtime.Tracking
         {
             ThrowIfDisposed();
 
-            DestroyTracker();
+            _worker.RequestReset();
             _snapshot.ResetToEmpty();
             _stampMap.Clear();
-            _flipBuffer = null;
-
-            CreateAndStartTracker();
+            _submitGate.Reset();
             _timestampGenerator.ResetForRecreate();
         }
 
@@ -222,67 +212,149 @@ namespace MediaPipeUnityDots.Runtime.Tracking
                 return;
             }
 
-            DestroyTracker();
-            _flipBuffer = null;
             _disposed = true;
+            _worker.Dispose();
+            if (_worker.ShutdownError != null)
+            {
+                MpudLog.Error($"[MPUD] hand worker shutdown: {_worker.ShutdownError}");
+            }
         }
 
-        private void CreateAndStartTracker()
+        // 네이티브 호출 전담. 모든 메서드는 워커 스레드에서 실행된다(Unity API 호출 금지).
+        private sealed class HandWorkerBody : ITrackerWorkerBody<MpudHandResult>
         {
-            Debug.Assert(
-                Marshal.SizeOf<MpudHandResult>() == MpudHandResult.ExpectedSize,
-                "MpudHandResult ABI mismatch with native bridge.");
-            var modelPathNative = MarshalStringToUtf8(_modelPath);
-            try
-            {
-                var config = new MpudHandTrackerConfig
-                {
-                    modelAssetPath = modelPathNative,
-                    numHands = _numHands,
-                    minDetectionConfidence = MinDetectionConfidence,
-                    minTrackingConfidence = MinTrackingConfidence,
-                    runningMode = RunningModeVideo,
-                };
+            private readonly string _modelPath;
+            private readonly int _numHands;
+            private IntPtr _trackerHandle;
+            private Color32[] _flipBuffer;
 
-                var createStatus = MpudBridge.mpud_create_hand_tracker(ref config, out var trackerHandle);
-                if (createStatus != MpudStatus.Ok)
+            public HandWorkerBody(string modelPath, int numHands)
+            {
+                _modelPath = modelPath;
+                _numHands = numHands;
+            }
+
+            public void Create()
+            {
+                var modelPathNative = MarshalStringToUtf8(_modelPath);
+                try
                 {
-                    throw new InvalidOperationException($"[MPUD] create_hand_tracker failed ({createStatus}): {MpudBridge.GetLastError()}");
+                    var config = new MpudHandTrackerConfig
+                    {
+                        modelAssetPath = modelPathNative,
+                        numHands = _numHands,
+                        minDetectionConfidence = MinDetectionConfidence,
+                        minTrackingConfidence = MinTrackingConfidence,
+                        runningMode = RunningModeVideo,
+                    };
+
+                    var createStatus = MpudBridge.mpud_create_hand_tracker(ref config, out var trackerHandle);
+                    if (createStatus != MpudStatus.Ok)
+                    {
+                        throw new InvalidOperationException($"[MPUD] create_hand_tracker failed ({createStatus}): {MpudBridge.GetLastError()}");
+                    }
+
+                    var startStatus = MpudBridge.mpud_start_hand_tracker(trackerHandle);
+                    if (startStatus != MpudStatus.Ok)
+                    {
+                        var error = MpudBridge.GetLastError();
+                        MpudBridge.mpud_destroy_hand_tracker(trackerHandle);
+                        throw new InvalidOperationException($"[MPUD] start_hand_tracker failed ({startStatus}): {error}");
+                    }
+
+                    _trackerHandle = trackerHandle;
+                }
+                finally
+                {
+                    Marshal.FreeHGlobal(modelPathNative);
+                }
+            }
+
+            public bool Invoke(in TrackerWorkItem item, out MpudHandResult completed, out string error)
+            {
+                completed = default;
+                error = null;
+
+                var submitPixels = item.Pixels;
+                var pixelCount = checked(item.Width * item.Height);
+                if (submitPixels == null || submitPixels.Length < pixelCount)
+                {
+                    error = "[MPUD] submit_frame skipped: invalid input buffer.";
+                    return false;
                 }
 
-                var startStatus = MpudBridge.mpud_start_hand_tracker(trackerHandle);
-                if (startStatus != MpudStatus.Ok)
+                if (item.FlipVertically)
                 {
-                    var error = MpudBridge.GetLastError();
-                    MpudBridge.mpud_destroy_hand_tracker(trackerHandle);
-                    throw new InvalidOperationException($"[MPUD] start_hand_tracker failed ({startStatus}): {error}");
+                    if (_flipBuffer == null || _flipBuffer.Length != pixelCount)
+                    {
+                        _flipBuffer = new Color32[pixelCount];
+                    }
+
+                    ImageFrameConverter.FlipVertical(item.Pixels, _flipBuffer, item.Width, item.Height);
+                    submitPixels = _flipBuffer;
                 }
 
-                _trackerHandle = trackerHandle;
-                _snapshot.ResetToEmpty();
-            }
-            finally
-            {
-                Marshal.FreeHGlobal(modelPathNative);
-            }
-        }
+                GCHandle pinnedHandle = default;
+                try
+                {
+                    pinnedHandle = GCHandle.Alloc(submitPixels, GCHandleType.Pinned);
+                    var frame = ImageFrameConverter.CreateFrame(
+                        pinnedHandle,
+                        item.Width,
+                        item.Height,
+                        item.SubmitTimestampUs);
 
-        private void DestroyTracker()
-        {
-            if (_trackerHandle == IntPtr.Zero)
-            {
-                return;
+                    var submitStatus = MpudBridge.mpud_submit_frame(_trackerHandle, ref frame);
+                    if (submitStatus != MpudStatus.Ok)
+                    {
+                        error = $"[MPUD] submit_frame failed ({submitStatus}): {MpudBridge.GetLastError()}";
+                        return false;
+                    }
+                }
+                finally
+                {
+                    if (pinnedHandle.IsAllocated)
+                    {
+                        pinnedHandle.Free();
+                    }
+                }
+
+                var pollStatus = MpudBridge.mpud_try_get_latest_result(_trackerHandle, out var result);
+                if (pollStatus == MpudStatus.Ok)
+                {
+                    completed = result;
+                    return true;
+                }
+
+                if (pollStatus != MpudStatus.NoResult)
+                {
+                    error = $"[MPUD] try_get_latest_result failed ({pollStatus}): {MpudBridge.GetLastError()}";
+                }
+
+                return false;
             }
 
-            MpudBridge.mpud_destroy_hand_tracker(_trackerHandle);
-            _trackerHandle = IntPtr.Zero;
-        }
-
-        private void EnsureFlipBuffer(int pixelCount)
-        {
-            if (_flipBuffer == null || _flipBuffer.Length != pixelCount)
+            public void ResetBody()
             {
-                _flipBuffer = new Color32[pixelCount];
+                DestroyTracker();
+                _flipBuffer = null;
+                Create();
+            }
+
+            public void Destroy()
+            {
+                DestroyTracker();
+            }
+
+            private void DestroyTracker()
+            {
+                if (_trackerHandle == IntPtr.Zero)
+                {
+                    return;
+                }
+
+                MpudBridge.mpud_destroy_hand_tracker(_trackerHandle);
+                _trackerHandle = IntPtr.Zero;
             }
         }
 

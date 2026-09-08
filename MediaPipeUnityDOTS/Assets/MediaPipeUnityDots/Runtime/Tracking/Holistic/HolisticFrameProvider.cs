@@ -81,6 +81,23 @@ namespace MediaPipeUnityDots.Runtime.Tracking
                 return;
             }
 
+            if (_service.TryTakeCompleted())
+            {
+                if (MpudLog.Enabled && _logIntervalFrames > 0 && _submitCount % _logIntervalFrames == 0)
+                {
+                    MpudLog.Log(
+                        $"[MPUD] Holistic frame #{_service.LatestFrameCount} | Valid={_service.LatestIsValid} | Face={_service.LatestFaceLandmarkCount} Pose={_service.LatestPoseLandmarkCount} L={_service.LatestLeftHandLandmarkCount} R={_service.LatestRightHandLandmarkCount} | ts={_service.LatestTimestampUs}");
+                }
+
+                if (TryGetEntityManager(out var entityManager)
+                    && _service.LatestTimestampUs > _lastCopiedTimestamp)
+                {
+                    PushAllToEcs(entityManager);
+                    _lastCopiedTimestamp = _service.LatestTimestampUs;
+                }
+            }
+
+            // 카메라 입력이 없어도 완료 결과는 먼저 수신한다.
             var pixels = _webcamSource.LatestPixels;
             var width = _webcamSource.LatestPixelWidth;
             var height = _webcamSource.LatestPixelHeight;
@@ -89,33 +106,14 @@ namespace MediaPipeUnityDots.Runtime.Tracking
                 return;
             }
 
-            var previousFrameCount = _service.LatestFrameCount;
-            _service.SubmitAndPoll(pixels, width, height, _webcamSource.LatestFlipVertically, new CaptureStamp(_webcamSource.LatestCaptureId, _webcamSource.LatestCaptureTimestampUs, _webcamSource.CaptureEpoch));
-
-            if (_service.LatestFrameCount == previousFrameCount)
+            var stamp = new CaptureStamp(
+                _webcamSource.LatestCaptureId,
+                _webcamSource.LatestCaptureTimestampUs,
+                _webcamSource.CaptureEpoch);
+            if (_service.TrySubmit(pixels, width, height, _webcamSource.LatestFlipVertically, stamp))
             {
-                return;
+                _submitCount++;
             }
-
-            _submitCount++;
-            if (MpudLog.Enabled && _logIntervalFrames > 0 && _submitCount % _logIntervalFrames == 0)
-            {
-                MpudLog.Log(
-                    $"[MPUD] Holistic frame #{_service.LatestFrameCount} | Valid={_service.LatestIsValid} | Face={_service.LatestFaceLandmarkCount} Pose={_service.LatestPoseLandmarkCount} L={_service.LatestLeftHandLandmarkCount} R={_service.LatestRightHandLandmarkCount} | ts={_service.LatestTimestampUs}");
-            }
-
-            if (!TryGetEntityManager(out var entityManager))
-            {
-                return;
-            }
-
-            if (_service.LatestTimestampUs <= _lastCopiedTimestamp)
-            {
-                return;
-            }
-
-            PushAllToEcs(entityManager);
-            _lastCopiedTimestamp = _service.LatestTimestampUs;
         }
 
         private void OnDisable()
