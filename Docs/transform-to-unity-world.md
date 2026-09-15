@@ -29,7 +29,8 @@ plane = Origin + (u - 0.5) * AxisX + (v - 0.5) * AxisY
 기존 제출 이미지/UV 반전 규약을 유지한다. `videoVerticallyMirrored`일 때 제출 배열을 뒤집는다.
 `videoRotationAngle`을 이용한 90°/270° 보정은 아직 지원하지 않는다.
 
-`MapWithDepth(x, y, depth, mapping)`은 평면 위치를 **같은 화면 픽셀에 투영되는 위치**로 이동한다.
+`MapWithDepth(x, y, depth, mapping)`는 평면 위치를 **같은 화면 픽셀에 투영되는 위치**로 이동한다.
+2D 오버레이 전용이며 점별 근접 클리핑을 포함한다.
 
 ```text
 planeDepth = dot(plane - CameraPosition, Forward)
@@ -39,27 +40,29 @@ offset = depth - 0.05
 직교: position = plane + Forward * offset
 ```
 
-단순히 전방 벡터로만 이동하면 원근 카메라에서 화면 XY가 밀린다. 원근 모드에서는 카메라 광선 위에서 이동하여 이를 막는다.
-`Map(x, y, mapping)`은 깊이 0인 같은 함수를 사용한다. 따라서 2D와 3D 모두 동일한 픽셀 정합과 한 번의 전방 여유 거리(0.05)를 적용한다.
+`MapShapePreserving(x, y, depth, mapping)`은 3D 형태 보존용이다. 영상 XY는 배경 평면에
+그대로 두고 깊이만 전방으로 이동한다 (`plane + Forward * (depth - 0.05)`).
+점마다 광선을 따라 확대하지 않으므로 관절 각도·구간 비율이 깨지지 않으며,
+점별 근접 클리핑도 하지 않는다. 정확한 픽셀 겹침이 필요하면 2D 경로를 쓴다.
 
 ## 2. 표시용 깊이
-
-Hand/Pose 렌더 시스템은 각 대상의 유효한 정규화·월드 쌍을 한 번 순회해 범위를 집계한다.
-관리 배열이나 임시 NativeArray는 만들지 않으며, 대상별 최종 값은 스택의 `FixedList128Bytes<float2>`에 보관한다.
 
 ```text
 imageSize = (정규화 X 범위 * |AxisX| / UvScaleX,
              정규화 Y 범위 * |AxisY| / UvScaleY)
 scale = length(imageSize) / length(월드 XY 범위)
+span = 대상의 최대 worldZ - 최소 worldZ
+scale * span > 배경 평면 깊이 * 0.25이면 scale = 배경 평면 깊이 * 0.25 / span
 relativeZ = worldZ - 대상의 최대 worldZ
 표시 깊이 = filteredRelativeZ * scale
 ```
 
 - 고정 배율(손 ×4, 포즈 ×1)을 제거했다. 영상상의 대상 크기·Quad 크기·크롭에 따라 깊이 배율이 달라진다.
 - 월드 XY 범위가 퇴화하면 깊이 배율은 0이다. 단안 추론 결과로 배율을 정할 수 없을 때 깊이를 임의로 증폭하지 않는다.
+- 대상 깊이 범위 상한(`MaxTargetDepthFraction = 0.25`)은 카메라에 붙는 폭주를 막는다.
+  상한 적용은 균일 배율 축소라 형태를 찌그러뜨리지 않으며, 점별 근접 클리핑으로 대체하지 않는다.
 - 최대 Z를 기준으로 빼므로 모든 점이 배경 앞에 배치된다. 작은 Z가 더 카메라 쪽이며, 불투명 배경에 점이 가려지는 것을 방지한다.
 - 월드 원점을 일괄 이동해도 표시 결과는 변하지 않는다. 손목/고관절 원점 가정은 필요 없다.
-- 월드 데이터가 없는 포인트는 2D로 폴백한다. Face도 2D를 유지한다.
 
 ## 3. 필터와 시간
 

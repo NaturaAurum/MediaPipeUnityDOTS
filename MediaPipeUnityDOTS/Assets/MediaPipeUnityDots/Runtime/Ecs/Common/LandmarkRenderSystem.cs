@@ -9,7 +9,8 @@ namespace MediaPipeUnityDots.Runtime.Ecs
     /// <summary>
     /// 트래커 공통 렌더 시스템. Hand/Face/Pose 렌더 3종을 대체한다.
     /// 포인트의 Tracker로 기존 싱글턴·버퍼 중 하나를 고르고, 계산은 LandmarkRender 공유 코어가 한다.
-    /// 2D/3D 모두 영상 XY에 정합하고, 3D는 월드 Z의 상대 깊이를 카메라 광선 위에 배치한다.
+    /// 2D는 영상 XY에 정합하고, 3D는 평면 XY + 전방 깊이로 형태를 보존한다.
+    /// 대상 깊이 범위는 배경 거리 기준으로 묶으며 점별 근접 클리핑을 하지 않는다.
     /// Face는 월드 미지원이라 2D 폴백이다.
     /// 필터는 입력 타임스탬프가 바뀔 때만 전진하므로 렌더 FPS와 무관하다.
     /// 무효 상태나 버퍼 부족 인덱스는 필터 상태를 리셋하고 스케일 0으로 숨긴다.
@@ -68,7 +69,7 @@ namespace MediaPipeUnityDots.Runtime.Ecs
                 ? SystemAPI.GetSingleton<DepthSettings>()
                 : DepthSettings.Default;
 
-            var handDepths = new FixedList128Bytes<float2>();
+            var handDepths = new FixedList128Bytes<float3>();
             if (renderMode != 0 && hasHand && mapping.IsValid != 0 && handStatus.IsValid)
             {
                 var handCount = math.min(handStatus.HandCount, handDepths.Capacity);
@@ -94,7 +95,7 @@ namespace MediaPipeUnityDots.Runtime.Ecs
                 }
             }
 
-            var poseDepths = new FixedList128Bytes<float2>();
+            var poseDepths = new FixedList128Bytes<float3>();
             if (renderMode != 0 && hasPose && mapping.IsValid != 0 && poseStatus.IsValid)
             {
                 var poseCount = math.min(poseStatus.PoseCount, poseDepths.Capacity);

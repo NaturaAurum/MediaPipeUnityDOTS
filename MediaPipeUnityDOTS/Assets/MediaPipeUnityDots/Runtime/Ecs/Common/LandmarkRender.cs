@@ -55,7 +55,10 @@ namespace MediaPipeUnityDots.Runtime.Ecs
                 depth += depthCorrection;
             }
 
-            targetPos = LandmarkOverlayMapping.MapWithDepth(filtered.x, filtered.y, depth, in mapping);
+            // 3D는 평면 XY + 전방 깊이로 형태를 보존한다. 광선별 확대·점별 클리핑은 쓰지 않는다.
+            targetPos = useDepth != 0
+                ? LandmarkOverlayMapping.MapShapePreserving(filtered.x, filtered.y, depth, in mapping)
+                : LandmarkOverlayMapping.MapWithDepth(filtered.x, filtered.y, depth, in mapping);
         }
 
         /// <summary>
