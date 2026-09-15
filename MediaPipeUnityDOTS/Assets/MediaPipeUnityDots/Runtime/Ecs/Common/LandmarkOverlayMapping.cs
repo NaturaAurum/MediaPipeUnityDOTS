@@ -27,23 +27,20 @@ namespace MediaPipeUnityDots.Runtime.Ecs
         private const float OverlayEpsilon = 0.05f;
         private const float MinimumWorldSpan = 1e-6f;
 
+        // 대상 전체의 표시 깊이 범위가 배경 평면 깊이를 넘지 않게 묶는다.
+        // 점별 근접 클리핑은 형태를 찌그러뜨리므로 대상 단위에서 상한을 건다.
+        public const float MaxTargetDepthFraction = 0.25f;
+
         public static float3 Map(float x, float y, in LandmarkOverlayMapping mapping)
             => MapWithDepth(x, y, 0f, in mapping);
 
         /// <summary>
         /// 깊이를 바꿔도 배경 영상의 같은 픽셀에 투영한다. 음수 깊이는 카메라 쪽이다.
+        /// 2D 오버레이 전용이며 점별 근접 클리핑을 포함한다.
         /// </summary>
         public static float3 MapWithDepth(float x, float y, float depth, in LandmarkOverlayMapping mapping)
         {
-            var u = (x - mapping.UvOffsetX) / mapping.UvScaleX;
-            // 리더는 반전 없이 직접 인덱싱한다(row r = array[r]).
-            // flip=false면 y가 배열 분율 그대로(y=j), flip=true면 뒤집힌 배열에서 읽으므로(y=1-j).
-            // 배경 샘플링(vt → array fraction vt)을 역연산하면 아래 식이 된다.
-            var textureV = (mapping.Flipped != 0 ? 1f - y : y) - mapping.UvOffsetY;
-            var v = textureV / mapping.UvScaleY;
-            var plane = mapping.Origin
-                + (u - 0.5f) * mapping.AxisX
-                + (v - 0.5f) * mapping.AxisY;
+            var plane = PlanePosition(x, y, in mapping);
             var planeDepth = math.dot(plane - mapping.CameraPosition, mapping.Forward);
             var offset = depth - OverlayEpsilon;
             if (mapping.NearClipPlane > 0f)
@@ -57,6 +54,29 @@ namespace MediaPipeUnityDots.Runtime.Ecs
             }
 
             return plane + mapping.Forward * offset;
+        }
+
+        /// <summary>
+        /// 3D 형태 보존 배치. 영상 XY는 배경 평면에 그대로 두고 깊이만 전방으로 이동한다.
+        /// 점마다 광선을 따라 확대하지 않으므로 관절 각도·구간 비율이 깨지지 않는다.
+        /// 점별 근접 클리핑을 하지 않으므로 호출자가 대상 범위 상한을 보장해야 한다.
+        /// </summary>
+        public static float3 MapShapePreserving(float x, float y, float depth, in LandmarkOverlayMapping mapping)
+        {
+            return PlanePosition(x, y, in mapping) + mapping.Forward * (depth - OverlayEpsilon);
+        }
+
+        private static float3 PlanePosition(float x, float y, in LandmarkOverlayMapping mapping)
+        {
+            var u = (x - mapping.UvOffsetX) / mapping.UvScaleX;
+            // 리더는 반전 없이 직접 인덱싱한다(row r = array[r]).
+            // flip=false면 y가 배열 분율 그대로(y=j), flip=true면 뒤집힌 배열에서 읽으므로(y=1-j).
+            // 배경 샘플링(vt → array fraction vt)을 역연산하면 아래 식이 된다.
+            var textureV = (mapping.Flipped != 0 ? 1f - y : y) - mapping.UvOffsetY;
+            var v = textureV / mapping.UvScaleY;
+            return mapping.Origin
+                + (u - 0.5f) * mapping.AxisX
+                + (v - 0.5f) * mapping.AxisY;
         }
 
         /// <summary>
@@ -79,13 +99,15 @@ namespace MediaPipeUnityDots.Runtime.Ecs
     }
 
     // 대상별 유효 쌍만 집계한다. 관리 객체나 임시 NativeArray를 만들지 않는다.
-    internal struct LandmarkDepthBounds
+    // x=표시 깊이 배율(범위 상한 적용), y=최후방 Z, z=Z 범위.
+    public struct LandmarkDepthBounds
     {
         private float2 _imageMin;
         private float2 _imageMax;
         private float2 _worldMin;
         private float2 _worldMax;
         private float _farthestZ;
+        private float _nearestZ;
         private int _count;
 
         public void Add(float2 image, float3 world)
@@ -94,7 +116,7 @@ namespace MediaPipeUnityDots.Runtime.Ecs
             {
                 _imageMin = _imageMax = image;
                 _worldMin = _worldMax = world.xy;
-                _farthestZ = world.z;
+                _farthestZ = _nearestZ = world.z;
                 return;
             }
 
@@ -103,13 +125,31 @@ namespace MediaPipeUnityDots.Runtime.Ecs
             _worldMin = math.min(_worldMin, world.xy);
             _worldMax = math.max(_worldMax, world.xy);
             _farthestZ = math.max(_farthestZ, world.z);
+            _nearestZ = math.min(_nearestZ, world.z);
         }
 
-        public float2 Resolve(in LandmarkOverlayMapping mapping)
-            => _count == 0
-                ? new float2(0f, float.NaN)
-                : new float2(
-                    LandmarkOverlayMapping.GetDepthScale(_imageMax - _imageMin, _worldMax - _worldMin, in mapping),
-                    _farthestZ);
+        public float3 Resolve(in LandmarkOverlayMapping mapping)
+        {
+            if (_count == 0)
+            {
+                return new float3(0f, float.NaN, 0f);
+            }
+
+            var scale = LandmarkOverlayMapping.GetDepthScale(_imageMax - _imageMin, _worldMax - _worldMin, in mapping);
+            var span = _farthestZ - _nearestZ;
+            var centerDepth = math.dot(mapping.Origin - mapping.CameraPosition, mapping.Forward);
+            var maxExtent = centerDepth * LandmarkOverlayMapping.MaxTargetDepthFraction;
+            if (maxExtent <= 0f)
+            {
+                return new float3(0f, _farthestZ, span);
+            }
+
+            if (span > 0f && scale * span > maxExtent)
+            {
+                scale = maxExtent / span;
+            }
+
+            return new float3(scale, _farthestZ, span);
+        }
     }
 }

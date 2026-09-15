@@ -10,9 +10,8 @@ namespace MediaPipeUnityDots.Runtime.Ecs
     {
         public int Enabled;
 
-        // 0 = 2D 오버레이, 1 = 영상 XY + 월드 Z의 3D 정합. 미터 형상 복원이 아니며 Face는 2D 폴백.
+        // 0 = 2D 오버레이(영상 XY 정합), 1 = 3D 형태 보존(평면 XY + 월드 Z 깊이). Face는 2D 폴백.
         public int RenderMode;
-
         // Hand
         public float HandMinCutoff;
         public float HandBeta;
