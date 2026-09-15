@@ -18,6 +18,8 @@
 **/[Uu]ser[Ss]ettings/
 **/[Mm]emoryCaptures/
 **/[Rr]ecordings/
+**/[Pp]rofilerCaptures/
+**/mono_crash.*.json
 
 # Unity generated solution / project files
 *.csproj
