@@ -10,6 +10,11 @@
 - Update affected tests. Run a targeted check first (test/filter/build/log; prefer `-testFilter` over full EditMode), then broaden only if needed.
 - If verification fails, fix it or roll back your last change before adding features. Complete only with evidence; report results and next action.
 
+## Linear
+
+- All Linear-related operations MUST use only the Linear MCP tools; agents HAVE TO avoid Linear CLI, direct API/HTTP calls, browser automation, and every non-MCP path.
+- Verify by confirming that Linear work used only Linear MCP tool calls.
+
 ## Project Map
 
 - Unity version: `MediaPipeUnityDOTS/ProjectSettings/ProjectVersion.txt` (source of truth).
