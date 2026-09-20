@@ -1,0 +1,13 @@
+외부 검증 이미지
+
+이 패키지는 검증 사진을 재배포하지 않습니다.
+Tools/ConsumerSmoke/consumer_smoke.py가 검증 프로젝트에 다음 이미지를
+명시적으로 다운로드하고 SHA-256을 확인합니다.
+
+Hand/Pose/Holistic: https://storage.googleapis.com/mediapipe-assets/male_full_height_hands.jpg
+Face: https://storage.googleapis.com/mediapipe-assets/portrait.jpg
+Upstream test context: https://github.com/google-ai-edge/mediapipe/tree/master/mediapipe/tasks/testdata/vision
+
+사진에는 이 프로젝트의 MIT 라이선스를 적용하지 않습니다.
+검증 프로젝트나 생성된 Player를 별도로 배포하려면 사진의 권리·이용 조건을
+확인하거나 배포 권한을 보유한 입력으로 교체해야 합니다.

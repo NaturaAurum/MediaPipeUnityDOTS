@@ -12,7 +12,7 @@
 4. 필요한 경우 소비자 고유의 필터를 적용한다.
 5. UI, 제스처 처리, 게임 로직, 시각화 등은 소비자가 구성한다.
 
-이 문서는 현 구현 검토와 후속 작업 계획이다. 아래 제안 API와 배포 기능이 이미 구현되어 있다는 의미는 아니다. 코드 수정, 릴리스 발행, Linear 티켓 생성은 이 문서 작성 범위에 포함하지 않는다.
+2–7절은 검토 리비전을 기준으로 작성한 최초 진단과 요구사항이다. 당시의 실패 기록·경로·제안 API는 현재 구현 상태를 뜻하지 않는다. 구현 결과, 검증 증거와 아직 충족하지 못한 릴리스 게이트는 9절에 기록한다.
 
 ## 2. 검토 기준과 실측 결과
 
@@ -313,3 +313,63 @@ GitHub Release 첨부 파일은 Git UPM 설치 시 자동으로 내려오지 않
 - [프로젝트 폴더 구조](FolderStructure.md)
 - [Unity 월드 표시 매핑](transform-to-unity-world.md)
 - [랜드마크 노이즈 필터링](landmark-noise-filtering.md)
+
+## 9. 구현 결과와 릴리스 게이트
+
+**이번 작업의 완료 범위:** 소유자가 구현과 로컬 검증까지로 명시적으로 변경했다. 별도 Mac 검증과 공개 릴리스·버전 태그 발행은 후속 작업으로 남긴다. 아래의 이번 범위 완료 표기는 이 후속 작업까지 수행했다는 뜻이 아니다.
+
+### 9.1. 완료 기준별 상태
+
+패키지 내부 경로는 `MediaPipeUnityDOTS/Assets/MediaPipeUnityDots` 기준이다.
+
+| 태스크 | 구현 및 증거 | 상태 |
+| --- | --- | --- |
+| 1. UPM 구성 | `package.json`에 Inference 의존성과 Unity `6000.6` 기준을 선언했다. 빈 소비자의 첫 컴파일은 Git 패키지 의존성 하나만으로 실행한다. 이미지 검증용 선택 샘플의 Image Conversion 모듈은 그 이후 추가한다. | 구현·소비자 검증 완료 |
+| 2. 네이티브 | `Native/Build/PackageMacosNative.py`가 브리지와 동적 의존성 12개를 함께 배포하고, 시스템 라이브러리를 제외한 링크를 `@loader_path`로 변경한 후 서명한다. 깨끗한 upstream checkout에서 재빌드한 브리지의 SHA-256이 기존 배포물과 일치했다. | 이번 범위 완료, 별도 Mac 검증은 후속 |
+| 3. 모델 | `EditorTool/ModelManifest.txt`에 출처·버전·SHA-256을 고정했다. 명시적 모델 준비, 소비자 경로 선택, 무결성 검사, Provider 연결, StreamingAssets 및 Player 포함을 제공한다. 외부 소비자에서 4종 추론과 Depth 모델 Import를 확인했다. | 완료 |
+| 4. 샘플 | `Samples~/LandmarkApi`와 `Samples~/TrackingDemo`를 선택 Import로 분리했다. Tracking Demo의 외부 에셋 참조 43개를 확인했고, 폐기된 URP 리소스 참조를 제거했다. 실제 UI 렌더와 설정 패널 테스트를 확인했다. | 완료 |
+| 5. 결과 API | `Runtime/Tracking/TrackingResult.cs`, 트래커별 서비스·스냅샷, ECS 리더에 메타데이터와 caller-owned 복사 경로를 제공한다. normalized/model-world/표시 좌표, 시간 기준, 유효 범위, 소유권을 패키지 README에 명시했다. | 완료 |
+| 6. 필터 | `Runtime/Tracking/Filtering`의 관리 계층 확장 계약과 렌더 독립 ECS 필터를 제공한다. raw 보존, 별도 normalized/world 상태, 중복 시각, 연속성 변경, 손실·재검출, 교체·reset 실패를 검증했다. 워밍업 이후 기본 필터의 managed 할당은 0바이트였다. | 완료 |
+| 7. 상태 | 대기·성공·미검출·오류·reset·dispose·stale을 구분한다. Hand 서비스의 상태 전환과 4종 스냅샷의 복사·초기화를 검사했다. 실패한 필터 출력 및 이전 성공 캐시가 유효 결과로 노출되지 않도록 수정했다. | 완료 |
+| 8. 소비 예제 | 이름 있는 Hand/Pose 인덱스, 연결선, Face blendshape 대응과 최소 C# 예제를 제공한다. 실제 추론 결과의 손가락 끝·포즈 관절·jawOpen 접근 및 사용자 필터를 검증했다. README의 최소 예제도 외부 소비자에서 컴파일했다. | 완료 |
+| 9. 소비자 자동화 | `Tools/ConsumerSmoke/consumer_smoke.py`가 지정 Git 리비전에서 빈 프로젝트를 만들고 설치·컴파일·모델 준비·Editor 추론·Player 빌드·격리 실행을 연속 검증한다. 검증 로그와 Git 해석 결과를 보존한다. | 최종 고정 리비전 검증 완료 |
+| 10. 릴리스 | 소유자 선택에 따라 자체 코드는 MIT로 명시했다. 패키지 README, CHANGELOG, Third Party Notices, 네이티브별 라이선스·소스·빌드 고지와 지원표를 작성했다. | 이번 범위 완료, 공개 릴리스·태그는 후속 |
+
+### 9.2. 검증 범위와 증거
+
+- 호스트: Apple M4 Pro, macOS `26.5.1`, Unity `6000.6.0f1`.
+- 대상 네임스페이스 EditMode: **87/87 통과**, 실패·skip 0. 그래픽을 활성화한 실행으로 UI 테스트도 포함했다.
+  - 결과: `/tmp/mpud-library-final.xml`
+  - 로그: `/tmp/mpud-library-final.log`
+- 필터 회귀: **13/13 통과**. 렌더 엔티티 없이 실제 ECS 시스템을 갱신하는 검사, raw/world 보존, 기본 필터 할당 검사와 사용자 reset 예외 회귀를 포함한다.
+  - 결과: `/tmp/mpud-library-filters-final.xml`
+  - 수정 전 재현: `/tmp/mpud-reset-before.xml`, `/tmp/mpud-replace-before.xml`
+- 깨끗한 네이티브 빌드:
+  - MediaPipe upstream: `6d31f1ebc3284db74d211d62bdc4f0a0c29ea120`
+  - 브리지 SHA-256: `72cd9fc49b3354f5198aa7383b2c11d3bba42115b18fd849cfb4261af6080a6c`
+  - 동봉 dylib 합계: **12개, 45,401,664바이트**.
+  - 모든 Mach-O의 최소 OS 요구를 합산한 배포 하한은 macOS **26.0**이다. 실제 실행 검증 OS는 위의 `26.5.1`이며 다른 OS 버전을 실측한 것으로 간주하지 않는다.
+  - 개발 중이던 기존 dirty upstream은 그대로 두고, 별도의 깨끗한 checkout에서 빌드했다.
+- 최종 Git 소비자 자동 검증: **설치·모델 준비·Editor·Player 빌드·Player 실행 전 단계 통과**.
+  - 임시 검증 저장소의 고정 리비전: `ae9872d750ba5be2c53119911ffb50d9c7b35fa8`. `git-resolution.json`에서도 `source: git`와 동일한 hash를 확인했다.
+  - 산출물: `/tmp/mpud-git-consumer-v6/{import,models,editor,build,player}.log`, `git-resolution.json`, `LandmarkApiSmoke.app`.
+  - Editor와 Player 모두 Hand/Face/Pose/Holistic `status=Success`, raw 복사, 기본·사용자 필터, 이름 기반 접근, reset·미검출·해제 검사를 통과했다.
+  - 기본 필터 평활화 검사는 실제 Hand 출력에 좌표·시간 차이를 준 두 프레임으로 수행했다. 두 번의 실시간 카메라 추론을 수행한 것으로 해석하지 않는다.
+  - Player는 네트워크와 `/opt/homebrew`, `/usr/local/Cellar`, `/usr/local/opt` 읽기를 차단한 sandbox에서 실행했다. Unity 자체의 네트워크 접근 실패 로그는 이 차단의 결과이며 추론은 성공했다.
+  - 생성한 소비자 프로젝트나 Import한 샘플을 수동 수정하지 않고 한 번의 자동화 명령으로 통과했다.
+  - Git에 저장된 브리지 blob은 **14,576,160바이트**로, LFS 포인터가 아닌 실제 바이너리임을 확인했다.
+- 외부 소비자의 선택 기능:
+  - `/tmp/mpud-git-consumer-v5/depth-model.log`: Depth 모델 다운로드·무결성 검사·ModelAsset Import.
+  - `/tmp/mpud-git-consumer-v5/sample-probe-fixed.log`: `PASS refs=43 depth=depth_anything_v2_small scene=SampleScene`.
+  - `/tmp/mpud-git-consumer-v5/demo-ui-fixed.log`, `/tmp/mpud-git-consumer-v5/demo-ui.png`: 실제 Play Mode의 UI Toolkit 패널·한글·스타일 표시. 웹캠은 비활성화했으므로 실시간 웹캠 추론의 증거는 아니다.
+- 문서의 로컬 링크 8개 파일을 검사했으며 끊어진 링크는 없었다. 검증용 임시 Editor 소스는 제거하고 로그·스크린샷은 보존했다.
+
+위 `/tmp` 파일은 로컬 검증 산출물이며 영구 CI 아카이브나 공개 릴리스 증거 링크가 아니다.
+
+### 9.3. 후속 검증과 발행 절차
+
+1. **Homebrew/Bazel이 없는 별도 Mac 실행 검증은 후속 작업으로 남긴다.** 개발 머신에만 존재하는 의존성을 배제하기 위한 배포 검증이며, 구현 작업 자체에 다른 Mac이 필요한 것은 아니다. 같은 호스트에서 네트워크와 Homebrew 경로 읽기를 차단한 Player 실행은 통과했지만, 별도 머신 검증까지 완료한 것으로 표시하지 않는다.
+2. 현재 릴리스 메타데이터는 **`0.1.0 — Unreleased`**다. 실제 발행되지 않은 `v0.1.0` 태그나 원격 설치 성공을 주장하지 않는다. 임시 검증 저장소의 커밋은 제품 저장소의 공개 릴리스가 아니다.
+3. `BRANCH_RULE.md`에 따라 feature → develop PR, release → main PR을 squash로 통합한 뒤 검증한 릴리스 리비전에 버전 태그를 부여한다. `main`/`develop` 직접 커밋·푸시는 하지 않는다.
+4. 확인한 Player 범위는 **macOS Apple Silicon, Mono, CPU 추론**이다. IL2CPP, Intel macOS, 다른 OS, Depth Player, 실시간 웹캠을 검증 완료로 표기하지 않는다.
+5. 자체 코드의 MIT와 동봉 네이티브의 Apache/BSD/GNU 계열 조건은 별개다. 모델은 Git 배포물에 포함하지 않는다. 모델이나 검증 사진을 재배포할 경우 해당 자산의 조건을 별도로 확인한다.

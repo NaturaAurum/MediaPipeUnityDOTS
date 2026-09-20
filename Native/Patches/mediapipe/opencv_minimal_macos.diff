@@ -1,0 +1,18 @@
+diff --git a/third_party/opencv_macos.BUILD b/third_party/opencv_macos.BUILD
+--- a/third_party/opencv_macos.BUILD
++++ b/third_party/opencv_macos.BUILD
+@@ -43,11 +43,10 @@ cc_library(
+         [
+             paths.join(PREFIX, "lib/libopencv_core.dylib"),
+             paths.join(PREFIX, "lib/libopencv_calib3d.dylib"),
+             paths.join(PREFIX, "lib/libopencv_features2d.dylib"),
+-            paths.join(PREFIX, "lib/libopencv_highgui.dylib"),
+-            paths.join(PREFIX, "lib/libopencv_imgcodecs.dylib"),
+             paths.join(PREFIX, "lib/libopencv_imgproc.dylib"),
+-            paths.join(PREFIX, "lib/libopencv_video.dylib"),
+-            paths.join(PREFIX, "lib/libopencv_videoio.dylib"),
++            # calib3d transitively imports features2d and flann; keep these
++            # modules while excluding unused highgui/video/imgcodecs stacks.
++            paths.join(PREFIX, "lib/libopencv_flann.dylib"),
+         ],
+     ),

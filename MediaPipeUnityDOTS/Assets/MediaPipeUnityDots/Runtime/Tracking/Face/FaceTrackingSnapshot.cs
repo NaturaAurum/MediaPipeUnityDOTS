@@ -11,8 +11,8 @@ namespace MediaPipeUnityDots.Runtime.Tracking
     {
         public const int MaxFaces = MpudFaceResult.MaxFaces;
 
-        private const int LandmarkCapacity = MpudFaceResult.LandmarksPerFace;
-        private const int BlendshapeCapacity = MpudFaceResult.BlendshapesPerFace;
+        public const int LandmarkCapacity = MpudFaceResult.LandmarksPerFace;
+        public const int BlendshapeCapacity = MpudFaceResult.BlendshapesPerFace;
 
         private readonly MpudNormalizedLandmark[] _landmarks;
         private readonly int[] _landmarkCounts;
@@ -30,7 +30,21 @@ namespace MediaPipeUnityDots.Runtime.Tracking
 
         public int FaceCount { get; private set; }
 
-        public bool IsValid => FaceCount > 0;
+        public bool IsValid
+        {
+            get
+            {
+                for (var face = 0; face < FaceCount; face++)
+                {
+                    if (_landmarkCounts[face] > 0)
+                    {
+                        return true;
+                    }
+                }
+
+                return false;
+            }
+        }
 
         public int LandmarkCount => FaceCount > 0 ? _landmarkCounts[0] : 0;
 
@@ -124,7 +138,7 @@ namespace MediaPipeUnityDots.Runtime.Tracking
         }
 
         /// <summary>
-        /// 지정 얼굴의 landmark를 caller-owned destination에 복사한다.
+        /// 지정 얼굴의 normalized image landmark를 caller-owned destination에 복사한다.
         /// destination은 최소 478 capacity여야 한다.
         /// 반환값은 복사된 landmark 수.
         /// </summary>

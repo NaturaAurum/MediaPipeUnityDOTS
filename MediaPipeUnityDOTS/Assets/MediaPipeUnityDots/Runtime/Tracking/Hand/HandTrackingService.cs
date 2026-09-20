@@ -23,6 +23,12 @@ namespace MediaPipeUnityDots.Runtime.Tracking
         private readonly SubmitGate _submitGate = new();
         private readonly TrackerWorker<MpudHandResult> _worker;
         private bool _disposed;
+        private TrackingResultStatus _latestStatus;
+        private TrackingResultMetadata _latestMetadata;
+        private string _latestError;
+        private long _lastSubmittedTimestampUs;
+        private long _lastResultTimestampUs;
+
 
         public HandTrackingService(string modelPath, int numHands = 2)
         {
@@ -46,9 +52,30 @@ namespace MediaPipeUnityDots.Runtime.Tracking
             _snapshot = new HandTrackingSnapshot();
             _timestampGenerator = new MonotonicTimestampGenerator();
             _worker = new TrackerWorker<MpudHandResult>("HandTracker", new HandWorkerBody(modelPath, numHands));
+            _latestStatus = TrackingResultStatus.Waiting;
+            _latestMetadata = TrackingResultMetadata.Empty(_latestStatus);
+        }
+        internal HandTrackingService(ITrackerWorkerBody<MpudHandResult> body)
+        {
+            if (body == null)
+            {
+                throw new ArgumentNullException(nameof(body));
+            }
+
+            _snapshot = new HandTrackingSnapshot();
+            _timestampGenerator = new MonotonicTimestampGenerator();
+            _worker = new TrackerWorker<MpudHandResult>("HandTracker.Test", body);
+            _latestStatus = TrackingResultStatus.Waiting;
+            _latestMetadata = TrackingResultMetadata.Empty(_latestStatus);
         }
 
         public bool LatestIsValid => _snapshot.IsValid;
+
+        public TrackingResultStatus LatestStatus => _latestStatus;
+
+        public TrackingResultMetadata LatestMetadata => _latestMetadata;
+
+        public string LatestError => _latestError;
 
         public int LatestHandedness => _snapshot.Handedness;
 
@@ -67,12 +94,23 @@ namespace MediaPipeUnityDots.Runtime.Tracking
         public long LatestCaptureEpoch => _snapshot.CaptureEpoch;
 
         public int LatestHandCount => _snapshot.HandCount;
+        public int GetLatestHandedness(int hand)
+        {
+            ThrowIfDisposed();
+            return _snapshot.GetHandedness(hand);
+        }
 
-        public int GetLatestHandedness(int hand) => _snapshot.GetHandedness(hand);
+        public float GetLatestScore(int hand)
+        {
+            ThrowIfDisposed();
+            return _snapshot.GetScore(hand);
+        }
 
-        public float GetLatestScore(int hand) => _snapshot.GetScore(hand);
-
-        public int GetLatestLandmarkCount(int hand) => _snapshot.GetLandmarkCount(hand);
+        public int GetLatestLandmarkCount(int hand)
+        {
+            ThrowIfDisposed();
+            return _snapshot.GetLandmarkCount(hand);
+        }
 
         /// <summary>
         /// 새 캡처를 제출한다. 중복 캡처·미생성 시 false. 호출자 버퍼는 소유 슬롯에 복사된다.
@@ -116,8 +154,7 @@ namespace MediaPipeUnityDots.Runtime.Tracking
             _submitGate.CopyInput(pixels, pixelCount);
 
             var submitTimestampUs = _timestampGenerator.NextTimestampUs();
-            _stampMap.Register(submitTimestampUs, stamp);
-
+            _lastSubmittedTimestampUs = submitTimestampUs;
             var item = new TrackerWorkItem
             {
                 Stamp = stamp,
@@ -133,33 +170,69 @@ namespace MediaPipeUnityDots.Runtime.Tracking
                 return false;
             }
 
+            _stampMap.Register(submitTimestampUs, stamp);
             return true;
         }
 
         /// <summary>
-        /// 완료된 결과를 한 번만 가져온다. 새 프레임이 poll되면 true.
+        /// 완료 슬롯을 한 번만 소비한다. Waiting은 아직 완료가 없음을 뜻한다.
         /// </summary>
-        public bool TryTakeCompleted()
+        public TrackingResultStatus Poll()
         {
-            ThrowIfDisposed();
+            if (_disposed)
+            {
+                return TrackingResultStatus.Disposed;
+            }
 
             if (!_worker.TryTake(out var completion))
             {
-                return false;
+                return TrackingResultStatus.Waiting;
             }
 
             if (!completion.Ok)
             {
-                MpudLog.Error(completion.Error);
-                return false;
+                _snapshot.ResetToEmpty();
+                _latestError = completion.Error ?? _worker.FaultError ?? "hand worker failed.";
+                _latestStatus = TrackingResultStatus.Error;
+                _latestMetadata = new TrackingResultMetadata(
+                    _latestStatus, 0, completion.Stamp.CaptureId, completion.Stamp.CaptureTimestampUs,
+                    completion.Stamp.CaptureEpoch, 0, completion.Generation, _lastSubmittedTimestampUs);
+                MpudLog.Error("[MPUD] " + _latestError);
+                return _latestStatus;
             }
 
             var result = completion.Result;
+            if (_lastResultTimestampUs > 0 && result.timestampUs <= _lastResultTimestampUs)
+            {
+                _snapshot.ResetToEmpty();
+                _latestError = null;
+                _latestStatus = TrackingResultStatus.Stale;
+                _latestMetadata = new TrackingResultMetadata(
+                    _latestStatus, result.timestampUs, completion.Stamp.CaptureId,
+                    completion.Stamp.CaptureTimestampUs, completion.Stamp.CaptureEpoch,
+                    0, completion.Generation, _lastSubmittedTimestampUs);
+                return _latestStatus;
+            }
+
+            _lastResultTimestampUs = result.timestampUs;
             _snapshot.UpdateFrom(ref result);
-            _stampMap.TryTake(_snapshot.TimestampUs, out var resolved);
+            if (!_stampMap.TryTake(result.timestampUs, out var resolved))
+            {
+                resolved = completion.Stamp;
+            }
+
             _snapshot.SetCaptureStamp(resolved);
-            return true;
+            _latestError = null;
+            _latestStatus = _snapshot.IsValid
+                ? TrackingResultStatus.Success
+                : TrackingResultStatus.NoDetection;
+            _latestMetadata = new TrackingResultMetadata(
+                _latestStatus, _snapshot.TimestampUs, _snapshot.CaptureId,
+                _snapshot.CaptureTimestampUs, _snapshot.CaptureEpoch, _snapshot.FrameCount,
+                completion.Generation, result.timestampUs);
+            return _latestStatus;
         }
+
 
         /// <summary>
         /// 최신 스냅샷의 landmark를 caller-owned destination에 복사한다.
@@ -203,6 +276,11 @@ namespace MediaPipeUnityDots.Runtime.Tracking
             _stampMap.Clear();
             _submitGate.Reset();
             _timestampGenerator.ResetForRecreate();
+            _lastSubmittedTimestampUs = 0;
+            _lastResultTimestampUs = 0;
+            _latestError = null;
+            _latestStatus = TrackingResultStatus.Reset;
+            _latestMetadata = TrackingResultMetadata.Empty(_latestStatus, _worker.Generation);
         }
 
         public void Dispose()
@@ -212,8 +290,12 @@ namespace MediaPipeUnityDots.Runtime.Tracking
                 return;
             }
 
+            _snapshot.ResetToEmpty();
             _disposed = true;
             _worker.Dispose();
+            _latestError = null;
+            _latestStatus = TrackingResultStatus.Disposed;
+            _latestMetadata = TrackingResultMetadata.Empty(_latestStatus, _worker.Generation);
             if (_worker.ShutdownError != null)
             {
                 MpudLog.Error($"[MPUD] hand worker shutdown: {_worker.ShutdownError}");

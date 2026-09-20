@@ -11,7 +11,7 @@ namespace MediaPipeUnityDots.Runtime.Tracking
     {
         public const int MaxPoses = MpudPoseResult.MaxPoses;
 
-        private const int LandmarkCapacity = MpudPoseResult.LandmarksPerPose;
+        public const int LandmarkCapacity = MpudPoseResult.LandmarksPerPose;
 
         private readonly MpudNormalizedLandmark[] _landmarks;
         private readonly MpudNormalizedLandmark[] _worldLandmarks;
@@ -27,7 +27,21 @@ namespace MediaPipeUnityDots.Runtime.Tracking
 
         public int PoseCount { get; private set; }
 
-        public bool IsValid => PoseCount > 0;
+        public bool IsValid
+        {
+            get
+            {
+                for (var pose = 0; pose < PoseCount; pose++)
+                {
+                    if (_landmarkCounts[pose] > 0)
+                    {
+                        return true;
+                    }
+                }
+
+                return false;
+            }
+        }
 
         public int LandmarkCount => PoseCount > 0 ? _landmarkCounts[0] : 0;
 
@@ -107,7 +121,7 @@ namespace MediaPipeUnityDots.Runtime.Tracking
         }
 
         /// <summary>
-        /// 지정 포즈의 landmark를 caller-owned destination에 복사한다.
+        /// 지정 포즈의 normalized image landmark를 caller-owned destination에 복사한다.
         /// destination은 최소 33 capacity여야 한다.
         /// 반환값은 복사된 landmark 수.
         /// </summary>

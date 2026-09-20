@@ -2,7 +2,8 @@
   "name": "MediaPipeUnityDots.EditorTool",
   "rootNamespace": "MediaPipeUnityDots.EditorTool",
   "references": [
-    "MediaPipeUnityDots.Runtime"
+    "MediaPipeUnityDots.Runtime",
+    "Unity.InferenceEngine"
   ],
   "includePlatforms": [
     "Editor"

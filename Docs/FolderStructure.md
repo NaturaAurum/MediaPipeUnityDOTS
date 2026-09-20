@@ -1,152 +1,61 @@
 # Folder Structure
 
-이 문서는 `MediaPipeUnityDOTS` 저장소의 초기 폴더 구조 원칙을 정리합니다.
-
-## Naming Convention
-
-- 기본 폴더명은 `PascalCase` 를 사용합니다.
-- 예외는 아래와 같습니다.
-- Unity embedded package의 실제 패키지 `name` 필드
-- Bazel, CMake, Gradle 같은 외부 툴체인 규칙
-- 외부 원본 구조를 그대로 반영해야 하는 예외 경로
-
-## Repository Root
+이 문서는 현재 UPM 패키지 원본과 개발 프로젝트의 경계를 설명합니다. 기본 폴더명은 PascalCase이며 `Samples~`, UPM 이름, 외부 툴체인/서드파티 경로는 해당 생태계 규칙을 따릅니다.
 
 ```text
-.
-├── Docs/
-├── Native/
-├── MediaPipeUnityDOTS/
-└── README.md
-```
-
-각 폴더의 역할은 다음과 같습니다.
-
-- `Docs`
-  - 아키텍처 문서
-  - PoC 범위 정의
-  - 프로파일링 결과
-  - 의사결정 기록
-- `Native`
-  - MediaPipe 브리지용 C/C++ 코드
-  - 플랫폼별 빌드 스크립트
-  - Unity로 전달할 ABI 정의
-- `MediaPipeUnityDOTS`
-  - 실제 Unity 프로젝트 루트
-  - 초기 단계에서는 브리지와 샘플을 함께 포함하는 메인 작업 공간
-
-## Unity Project Structure
-
-Unity 프로젝트 폴더명은 이미 준비된 상태를 유지하여 `MediaPipeUnityDOTS` 를 사용합니다.
-
-```text
+Native/
+├── Bridge/                     # C ABI 구현과 Bazel overlay
+├── Build/                      # 빌드·모델 다운로드·의존 번들 패키징
+├── Patches/mediapipe/           # 고정 upstream에 적용하는 패치
+├── Upstream/mediapipe/          # 고정 Git submodule, 사용자 작업 보존
+└── Artifacts/MacosEditor/       # 로컬 빌드 중간 산출물, Git 제외
 MediaPipeUnityDOTS/
 ├── Assets/
-│   ├── MediaPipeUnityDots/
+│   ├── MediaPipeUnityDots/      # UPM 패키지 원본
+│   │   ├── package.json
 │   │   ├── Runtime/
-│   │   ├── Sample/
-│   │   └── EditorTool/
-│   ├── Plugins/
-│   ├── Scenes/
-│   └── Settings/
-├── Packages/
-│   ├── manifest.json
-│   └── packages-lock.json
-└── ProjectSettings/
+│   │   │   ├── Interop/        # C 구조체 및 DllImport
+│   │   │   ├── Input/          # 입력 처리 유틸리티
+│   │   │   ├── Models/         # 소비자 모델 경로 API (코드)
+│   │   │   ├── Tracking/       # 서비스·스냅샷·Provider·이름 있는 topology
+│   │   │   │   └── Filtering/  # managed 필터 계약/coordinator/기본 구현
+│   │   │   ├── Ecs/            # unmanaged 원시/필터 버퍼·시스템·표시 매핑
+│   │   │   └── Plugins/macOS/  # 배포용 dylib 전체 의존 그래프·고지·manifest
+│   │   ├── EditorTool/         # 모델 준비·연결·빌드 검사
+│   │   ├── Tests/EditMode/     # Samples 어셈블리를 참조하지 않는 코어 테스트
+│   │   ├── Samples~/
+│   │   │   ├── TrackingDemo/   # UI·씬·프로필·URP 설정·샘플 테스트
+│   │   │   └── LandmarkApi/    # 렌더 없는 실제 입력 소비자 검증
+│   │   └── Models/            # 개발 중 다운로드한 Depth 모델, Git 제외
+│   ├── Samples/               # 선택 Import한 생성 복사본, Git 제외
+│   └── StreamingAssets/
+│       └── MediaPipe/Models/  # 다운로드한 Task 모델, Git 제외
+├── Packages/                  # 개발 프로젝트의 UPM manifest/lock
+└── ProjectSettings/           # 개발용 Unity 설정
+Tools/
+├── ImportSamples.py           # 개발 프로젝트에서 선언된 샘플 Import
+└── ConsumerSmoke/             # 빈 Git 소비자 및 macOS Player 검증
+Docs/                          # 설계·계획·검증 기록
 ```
 
-역할 분리는 아래 기준을 권장합니다.
+## 패키지와 소비자 자산
 
-- `Assets/MediaPipeUnityDots`
-  - 플러그인 본체 루트
-- `Assets/MediaPipeUnityDots/Runtime`
-  - C# interop 레이어 (`Interop`), 입력 유틸 (`Input`), 로깅 (`Logging`)
-  - `Ecs/Common|Hand|Face|Pose`: 컴포넌트·매핑·필터·스포너·렌더 시스템
-  - `Tracking/Hand|Face|Pose|Holistic`: 서비스·스냅샷·프로바이더
-    (+`Tracking` 루트의 공유 `WebcamFrameProvider`, `Hand`의 읽기 API)
-  - `Plugins/<platform>`: 네이티브 바이너리
-  - 폴더만 나누고 네임스페이스는 `Runtime.Ecs`/`Runtime.Tracking` 유지
-- `Assets/MediaPipeUnityDots/EditorTool`
-  - editor utility code 후보 위치
-  - 초반에는 최소한으로 유지
-  - Unity의 특수 `Editor` 폴더를 바로 쓰지 않기 위한 완충 영역
-- `Assets/Plugins`
-  - 비어 있음. 네이티브 바이너리는 `Runtime/Plugins/<platform>/` 로 이동 완료.
-- `Assets/MediaPipeUnityDots/Sample`
-  - 데모 씬 전용 MonoBehaviour (디버그 UI, 웹캠 배경, 스모크 테스트)
-  - 프레임 프로바이더·스포너·어댑터/DTO는 `Runtime`으로 승격 완료
-    (아래 "Runtime 승격" 참조)
-- `Assets/Scenes`
-  - 실행 씬과 테스트 씬
-- `Assets/Settings`
-  - 렌더링, 입력, 프로젝트별 ScriptableObject 설정 자산
-- `Packages`
-  - 현재는 Unity package manager 기본 관리 영역
-  - 패키지화는 추후 단계에서 검토
+- UPM URL의 하위 경로는 `/MediaPipeUnityDOTS/Assets/MediaPipeUnityDots`입니다. 루트 개발 프로젝트 전체를 의존성으로 설치하지 않습니다.
+- 패키지 의존성과 최소 Unity 버전은 `package.json`이 기준입니다. Inference Engine을 포함한 코어 의존성은 패키지가 선언합니다.
+- 네이티브 배포 dylib는 `Runtime/Plugins/macOS` 안에 Git 추적하며 소비자가 빌드하지 않습니다. `Native/Artifacts`의 중간 파일과 모델은 배포 Git에 넣지 않습니다.
+- `Runtime/Models`는 코드이며, 패키지 루트의 다운로드 자산용 `Models`와 다릅니다. 패키징 시 이름이 같다는 이유로 둘 다 제외하면 안 됩니다.
+- 다운로드 도구는 등록된 package resolvedPath에서 manifest를 **읽고**, 모델은 소비자 `Assets`에 **씁니다**. PackageCache는 수정하지 않습니다.
 
-## Why This Split
+## Samples 경계
 
-이 구조는 지금 필요한 세 층만 분리하기 위한 것입니다.
+`Samples~`는 설치만으로 컴파일되지 않습니다. Package Manager 또는 `Tools/ImportSamples.py`로 선택 Import하면 `Assets/Samples/MediaPipe Unity DOTS/<version>/<displayName>` 아래 복사본이 만들어집니다. 개발 프로젝트의 Build Settings도 Import한 Tracking Demo 씬을 사용합니다.
 
-1. `Native`
-   - MediaPipe 코어와 맞닿는 네이티브 계층
-2. `Assets/MediaPipeUnityDots`
-   - Unity 플러그인 계층
-3. `Assets/MediaPipeUnityDots/Sample`
+샘플 원본 변경은 `Samples~`에서 하고, 개발용 복사본은 `Tools/ImportSamples.py --replace`로 갱신합니다. Tracking Demo의 씬·프로필·UI·테마·URP 자산은 샘플 안에 유지합니다. 소비자별 Graphics/Quality, 카메라 권한, 선택 모델 설정은 프로젝트가 소유합니다.
 
-이렇게 나누면 브리지 계층과 샘플 계층이 섞이지 않아 PoC 이후 패키지화가 쉬워집니다.
+코어 테스트는 `MediaPipeUnityDots.Sample`을 참조하지 않습니다. UI 상호작용 테스트는 Tracking Demo의 Editor 테스트 어셈블리에 있으며, 실제 패널 이벤트가 필요하므로 `-nographics`로 검증하지 않습니다.
 
-## Initial Recommendation
+## 데이터/실행 경계
 
-초기 PoC에서는 다음 순서로 진행하는 것이 안전합니다.
+공개 서비스는 caller-owned 배열 복사와 상태·캡처 메타데이터를 제공합니다. managed `ILandmarkFilter`는 관리 계층의 동기 확장 지점입니다. ECS 컴포넌트·버퍼·Job에는 인터페이스, ViewModel, DI, UniTask, ReactiveProperty를 넣지 않습니다.
 
-1. `Native` 에 최소 브리지 API 정의
-2. `Assets/MediaPipeUnityDots/Runtime` 에 C# interop 레이어와 ECS 데이터 경로 작성
-3. `Assets/MediaPipeUnityDots/Sample` 와 `Assets/Scenes` 에 단일 모델 검증 씬 구성
-5. 구조가 안정되면 필요한 부분만 패키지화
-
-## Notes
-
-- 현재 `Assets/TutorialInfo` 는 Unity 템플릿 기본 자산으로 보이며, 추후 정리 대상입니다.
-- `Assets/Scenes` 와 `Assets/Settings` 는 이미 존재하므로 그대로 유지하면서 `MediaPipeUnityDots`, `Plugins` 를 추가하는 쪽이 자연스럽습니다.
-- 패키지화는 브리지 계층 경계가 충분히 안정된 뒤 진행하는 것이 좋습니다.
-
-## Runtime 승격 (완료)
-
-`Sample/HandTracking/Scripts`에서 플러그인 코어 체질을 `Runtime`으로 이동했다.
-
-- 승격됨: `Webcam/Face/Pose/HolisticFrameProvider`, `HandTrackingAdapter`,
-  `HandTrackingDto` → `Tracking/Hand|Face|Pose|Holistic` (+공유 웹캠은 `Tracking` 루트).
-  표시층은 `Ecs/Common`으로 통일: `LandmarkPointSpawner`·`LandmarkRenderSystem`·`LandmarkRender`
-  (`LandmarkPoint`/`LandmarkTracker`/`IPointSource`). 트래커별 포인트 태그·스포너·렌더 3종은 삭제.
-- 잔류: `OneEuroFilterSettingsPanel`, `HandTrackingStatusPanel`
-  (App 레이어 UI), `WebcamBackgroundRenderer`, `WebcamBackgroundToggle`
-  (데모 씬 전용), `NativeSmokeTest`(+Editor 러너, 진단용).
-
-## 패키지 목표와 외부 소비 계약
-
-이 저장소의 목표는 `Runtime`의 Unity 패키지(UPM)화다. 패키지 경계가
-성립하려면 브리지를 통해 얻은 값이 외부에서 가공하기 쉬워야 한다.
-
-- 외부 소비자는 `Runtime` 어셈블리만으로 값을 읽는다.
-  공식 읽기 API는 `HandTrackingAdapter`/`HandTrackingDto`
-  (`Runtime/Tracking`)이며, `Sample`/UI 어셈블리 참조 없이 접근 가능하다.
-- 읽기 API(`Get*Landmark` 접근자, 스냅샷 복사 API, 어댑터/DTO)는 `Runtime`에 둔다.
-- `Runtime`에 UI(App 레이어) 의존을 넣지 않는다
-  (R3/UniTask/VContainer/UI Toolkit 금지 — AGENTS.md UI/ECS 경계).
-
-## package.json (생성됨)
-
-- 위치: `Assets/MediaPipeUnityDots/package.json` (임베디드 패키지 루트).
-- `name` 가칭: `com.natura-aurum.mediapipe-unity-dots` (`0.1.0`),
-  `unity` 최소 `6000.0` (검증 환경 `6000.6.0f1`).
-- `dependencies` (잠금 버전 기준, `packages-lock.json` 실측):
-  - `com.unity.burst`: `2.0.0`
-  - `com.unity.collections`: `6.6.0`
-  - `com.unity.entities`: `6.6.0`
-  - `com.unity.mathematics`: `1.4.0`
-  - `com.unity.entities.graphics`: `6.6.0` — 스포너가 `Unity.Rendering`을
-    사용하므로 필수.
-- 레이아웃: `Sample/`은 유지한다. 이 저장소가 패키지 원본과 데모 프로젝트를
-  겸하므로 UPM 관례 `Samples~/` 전환은 저장소 분리 시점으로 연기한다.
-  네이티브 바이너리는 패키지 내 `Runtime/Plugins/<platform>/` 로 이동 완료.
+기본 `LandmarkFilterSystem`은 렌더 엔티티 없이 별도 필터 버퍼를 만듭니다. 렌더러는 그 결과의 표시 좌표만 계산하며 같은 필터를 다시 적용하지 않습니다. topology·좌표·수명·연속성 규칙은 [패키지 API 문서](../MediaPipeUnityDOTS/Assets/MediaPipeUnityDots/README.md)를 참고하세요.

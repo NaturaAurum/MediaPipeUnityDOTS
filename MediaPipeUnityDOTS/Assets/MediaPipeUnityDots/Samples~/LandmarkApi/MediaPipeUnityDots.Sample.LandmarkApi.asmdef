@@ -1,0 +1,16 @@
+{
+    "name": "MediaPipeUnityDots.Sample.LandmarkApi",
+    "rootNamespace": "MediaPipeUnityDots.Sample.LandmarkApi",
+    "references": [
+        "MediaPipeUnityDots.Runtime"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": true,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

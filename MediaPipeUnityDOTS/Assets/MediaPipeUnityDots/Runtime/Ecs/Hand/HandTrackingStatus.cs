@@ -1,3 +1,4 @@
+using MediaPipeUnityDots.Runtime.Tracking;
 using Unity.Collections;
 using Unity.Entities;
 
@@ -20,5 +21,6 @@ namespace MediaPipeUnityDots.Runtime.Ecs
         public long CaptureTimestampUs;
 
         public long CaptureEpoch;
+        public TrackingResultStatus ResultStatus;
     }
 }

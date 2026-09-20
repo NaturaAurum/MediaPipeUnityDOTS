@@ -1,128 +1,79 @@
 # MediaPipeUnityDOTS
 
-Unity DOTS (ECS + Jobs) 환경에서 MediaPipe를 성능 우선으로 통합하기 위한 실험용 저장소입니다.
+MediaPipe Hand·Face·Pose·Holistic 추론과 Unity DOTS 결과 처리를 제공하는 UPM 패키지입니다. 원시 결과 읽기, 렌더 독립 One Euro 필터, 소비자 구현 `ILandmarkFilter`를 지원합니다. 카메라·UI·데모 씬은 필수가 아닙니다.
 
-현재 방향은 MediaPipe 자체를 DOTS-native로 재작성하는 것이 아니라, upstream MediaPipe 코어는 유지하면서 Unity 쪽 경계 비용을 줄이는 하이브리드 아키텍처를 구축하는 것입니다.
+## 설치
 
-폴더명 컨벤션은 기본적으로 `PascalCase`를 사용합니다. 예외는 Unity 패키지명, 네이티브 툴체인 관례, 외부 서드파티 원본처럼 생태계 규칙을 따라야 하는 경우입니다.
-
-## Current Status
-
-- Unity 버전: `6000.6.0f1`
-- **Phase 1 (Native Bridge) 완료**: macOS Apple Silicon 전용 C ABI bridge 빌드 및 Unity Editor 검증 통과 (Hand/Face/Pose/Holistic 4종)
-- **Phase 2 (웹캠 캡처 → ECS 연동 → 시각화) 완료**: 웹캠 입력, ECS 싱글턴/버퍼 푸시, 배경 정합 오버레이, 1 Euro Filter, UI Toolkit 튜닝 패널까지 동작
-
-## Repository Layout
+Unity **6000.6** 이상에서 Package Manager → **Install package from git URL**에 다음 형식의 URL을 입력합니다. `<revision>`은 실제 검증한 커밋 SHA 또는 발행된 태그로 바꿉니다.
 
 ```text
-.
-├── Docs/                      # Architecture notes, plans, decisions
-├── Native/                    # Native bridge source and build scripts
-├── MediaPipeUnityDOTS/        # Unity project root
-│   ├── Assets/
-│   │   ├── MediaPipeUnityDots/
-│   │   │   ├── Runtime/       # Ecs, Tracking, Interop, Input, Logging
-│   │   │   ├── Sample/        # Providers, spawners, UI panels
-│   │   │   ├── Tests/         # EditMode regression tests
-│   │   │   ├── UI/            # .uxml / .uss sources
-│   │   │   └── EditorTool/
-│   │   ├── Plugins/
-│   │   └── Scenes/            # SampleScene.unity
-│   ├── Packages/
-│   └── ProjectSettings/
-├── BRANCH_RULE.md             # Branch flow and PR rules
-├── MVVM.md                    # MVVM + Rx conventions
-└── README.md
+https://github.com/NaturaAurum/MediaPipeUnityDOTS.git?path=/MediaPipeUnityDOTS/Assets/MediaPipeUnityDots#<revision>
 ```
 
-저장소 루트에 문서와 네이티브 브리지 소스를 두고, Unity 프로젝트는 별도 하위 폴더에서 관리합니다. 구조 상세는 [`Docs/FolderStructure.md`](./Docs/FolderStructure.md) 참고. 브랜치/PR 규칙은 [`BRANCH_RULE.md`](./BRANCH_RULE.md) 참고 (기본 타겟 `develop`).
+현재 패키지 버전은 `0.1.0`이며 공개 릴리스 태그는 아직 발행하지 않았습니다. 개발 브랜치를 릴리스로 간주하지 마세요. 별도 Mac 검증과 릴리스 게이트 상태는 [배포 계획의 검증 기록](Docs/LibraryDistributionPlan.md)을 확인하세요.
 
-## Quick Start
+1. 패키지가 선언한 Entities·Burst·Collections·Mathematics·Inference Engine 의존성이 자동 설치됩니다.
+2. **MediaPipe → Models → Download Hand/Face/Pose/Holistic Task Model**에서 사용할 모델만 준비합니다. 최초 준비에는 네트워크가 필요하고 이후 추론에는 필요하지 않습니다.
+3. [패키지 README와 API 예제](MediaPipeUnityDOTS/Assets/MediaPipeUnityDots/README.md)를 따라 서비스를 생성하고 결과를 읽습니다.
+4. UI가 필요하면 Package Manager의 Samples에서 **Tracking Demo**, 렌더 없는 검증은 **Landmark API**를 선택 Import합니다. 샘플별 추가 설정은 패키지 README에 있습니다.
+
+소비자에게 **Bazel·Homebrew·네이티브 빌드는 필요 없습니다.** macOS 플러그인과 비시스템 dylib 의존성을 패키지에 동봉합니다. 모델·검증 사진은 Git에 동봉하지 않습니다.
+
+## 지원 및 검증 범위
+
+| 항목 | 범위 |
+| --- | --- |
+| Unity 기준 | `6000.6.0f1`에서 검증, package.json 최소 `6000.6` |
+| 네이티브 바이너리 | macOS **26.0 이상**, Apple Silicon `arm64`, CPU 추론 |
+| Editor 실행 증거 | macOS `26.5.1`, Apple M4 Pro, Hand·Face·Pose·Holistic 실제 검출 |
+| Player 실행 증거 | 같은 호스트의 macOS Standalone **Mono**, 네트워크·Homebrew 접근 차단 상태의 4종 실제 검출 |
+| 별도 Mac | 아직 검증하지 않음. 같은 호스트의 sandbox 실행으로 대체해 완료 처리하지 않음 |
+| IL2CPP·Intel Mac·다른 OS | 지원 검증 범위 밖 |
+| Depth | 선택적 Inference Engine 모델 경로. 네이티브 4종과 별도이며 위 Player 검증에 포함하지 않음 |
+
+macOS 최소 버전은 브리지 하나가 아니라 **동봉한 모든 dylib의 Mach-O 최소 OS 중 최댓값**입니다. 현재 번들은 12개 dylib, 45,401,664바이트입니다.
+
+## 외부 소비자 검증
+
+실제 Git 리비전으로 빈 프로젝트를 생성하고 설치 → 모델 준비 → 4종 추론 → 원시/필터 결과 → 초기화·미검출·해제 → Player 실행을 검사합니다. Unity 라이선스가 활성화된 macOS 호스트에서 실행합니다.
 
 ```bash
-# 1. clone + submodule (develop 기준)
-git clone --recurse-submodules <repo-url> && git checkout develop
-
-# 2. 모델 다운로드 (4종 task bundle)
-Native/Build/DownloadModels.sh
-
-# 3. 네이티브 빌드 (macOS Apple Silicon)
-Native/Build/BuildMacosEditor.sh
-
-# 4. dylib → Unity Plugins 복사
-Native/Build/CopyArtifactsToUnity.sh
-
-# 5. Unity Editor에서 프로젝트 열기 → MediaPipe > Run Smoke Test
+python3 Tools/ConsumerSmoke/consumer_smoke.py \
+  --unity /Applications/Unity/Hub/Editor/6000.6.0f1/Unity.app/Contents/MacOS/Unity \
+  --git-url 'https://github.com/NaturaAurum/MediaPipeUnityDOTS.git?path=/MediaPipeUnityDOTS/Assets/MediaPipeUnityDots#<revision>' \
+  --workdir /tmp/mpud-consumer
 ```
 
-빌드 상세 및 필수 도구는 [`Native/README.md`](./Native/README.md) 참고.
+`--workdir`는 존재하지 않는 경로여야 합니다. 로그·프로젝트·Player를 보존하며 기존 디렉터리를 삭제하지 않습니다. Player 단계는 macOS sandbox에서 네트워크 및 `/opt/homebrew`, `/usr/local/Cellar`, `/usr/local/opt` 읽기를 차단합니다. 이 검사는 **다른 기기에서의 실행 증거와 구분**합니다.
 
-## Runtime Pipeline
+## 개발
+
+```bash
+git submodule update --init
+python3 Tools/ImportSamples.py
+Native/Build/DownloadModels.sh
+Native/Build/BuildMacosEditor.sh
+Native/Build/CopyArtifactsToUnity.sh
+```
+
+`Tools/ImportSamples.py --replace`는 이 패키지의 생성된 샘플 복사본만 갱신합니다. 샘플 원본은 `Samples~`에서 수정합니다. 네이티브 재빌드 도구와 출처·서명 검사는 [Native/README.md](Native/README.md)를 참고하세요.
 
 ```text
-WebcamTexture → FrameProvider → TrackingService → ECS singleton/buffer
-    → RenderSystem (1 Euro Filter → Overlay Mapping) → Entities Graphics 구체
-    → 배경 Quad (WebcamBackgroundRenderer, cover-crop 정합)
+Native/Bridge + Build + Patches → 패키지 내 macOS dylib 번들
+Runtime/Tracking → 원시 서비스 결과 / ECS 원시 버퍼
+                 → 기본 또는 사용자 필터 → 별도 필터 결과
+                                            → 선택적 좌표 변환·렌더링
+Samples~ → 선택 Import하는 UI·씬·검증 예제
 ```
 
-- 필터 파라미터는 SampleScene 우측 상단 패널(UI Toolkit)에서 실시간 조절. 설정은 `OneEuroFilterSettings` 싱글턴으로 푸시.
-- 주기성 로그는 `MpudLog` 단일 진입점 + 패널의 "상세 로그" 토글로 On/Off.
-- 회귀 테스트: `Assets/MediaPipeUnityDots/Tests/EditMode` (EditMode Test Runner).
+## 라이선스와 문서
 
-## Native → Unity 산출물 흐름
+프로젝트 자체 코드는 [MIT](LICENSE)입니다. MediaPipe, 네이티브 의존성, Unity 패키지, 모델·사진에는 각각의 조건이 적용됩니다. **전체 바이너리 번들이 MIT라는 뜻이 아닙니다.** [Third Party Notices](MediaPipeUnityDOTS/Assets/MediaPipeUnityDots/Third%20Party%20Notices.md)와 동봉된 라이선스·소스 레시피를 확인하세요.
 
-```
-Bazel build (Native/Upstream/mediapipe)
-    ↓
-Native/Artifacts/MacosEditor/libmpud_bridge.dylib   ← 빌드 산출물
-    ↓  CopyArtifactsToUnity.sh (install_name 수정 + ad-hoc codesign)
-MediaPipeUnityDOTS/Assets/Plugins/macOS/libmpud_bridge.dylib  ← Unity가 인식하는 위치
-    ↓
-C# DllImport("mpud_bridge")  ← Unity가 lib 접두사와 .dylib 확장자를 자동 해석
-```
-
-| 산출물                 | 경로                                                                | git 추적    |
-| ---------------------- | ------------------------------------------------------------------- | ----------- |
-| dylib (빌드 결과)      | `Native/Artifacts/MacosEditor/libmpud_bridge.dylib`                 | ✗ gitignore |
-| dylib (Unity 플러그인) | `Assets/Plugins/macOS/libmpud_bridge.dylib`                         | ✗ gitignore |
-| dylib .meta            | `Assets/Plugins/macOS/libmpud_bridge.dylib.meta`                    | ✓ 추적      |
-| 모델 파일              | `Assets/StreamingAssets/MediaPipe/Models/*.task` (4종)              | ✗ gitignore |
-| 모델 .meta             | `Assets/StreamingAssets/MediaPipe/Models/*.task.meta`               | ✓ 추적      |
-
-> `.dylib`와 `.task`는 용량이 크므로 git에서 제외합니다. clone 후 빌드/다운로드 스크립트로 재생성합니다.
-
-### Unity에서의 플러그인 인식
-
-- `Assets/Plugins/macOS/` 경로에 `.dylib`를 두면 Unity가 macOS 전용 네이티브 플러그인으로 자동 인식합니다.
-- C# 측에서는 `[DllImport("mpud_bridge")]` 로 참조합니다 — Unity가 `lib` 접두사와 `.dylib` 확장자를 플랫폼별로 자동 붙입니다.
-- `CallingConvention.Cdecl`을 명시해야 합니다 (C ABI bridge).
-
-### C# Interop 위치
-
-```
-Assets/MediaPipeUnityDots/Runtime/Interop/
-├── NativeStructs.cs    ← C 구조체 미러 (Hand/Face/Pose/Holistic 결과, 이미지 프레임 등)
-└── MpudBridge.cs       ← DllImport 선언 (4종 트래커 × create/submit/poll/destroy + 에러 조회)
-```
-
-## Direction
-
-핵심 목표:
-
-1. MediaPipe 네이티브 그래프 실행은 유지
-2. Unity ↔ Native 경계의 복사, 마샬링, GC 비용 최소화
-3. 결과 후처리와 게임플레이 연동은 DOTS 파이프라인으로 구성
-
-구현 방식:
-
-- MediaPipe upstream 기반 네이티브 코어 + 얇은 C ABI bridge
-- Unity 측에서는 `NativeArray` / unsafe pointer / Jobs 기반 후처리
-- `MediaPipeUnityDots` 플러그인과 샘플을 하나의 Unity 프로젝트에 포함 (PoC 단계)
-
-## Execution Docs
-
-- Native intake and build path: [`Docs/MediaPipeNativeIntegrationPlan.md`](./Docs/MediaPipeNativeIntegrationPlan.md)
-- First implementation slice: [`Docs/MediaPipePoCExecutionPlan.md`](./Docs/MediaPipePoCExecutionPlan.md)
-- World mapping: [`Docs/transform-to-unity-world.md`](./Docs/transform-to-unity-world.md)
-- Noise filtering: [`Docs/landmark-noise-filtering.md`](./Docs/landmark-noise-filtering.md)
-- DOTS best practices: [`Docs/dots-job-system-best-practices.md`](./Docs/dots-job-system-best-practices.md)
+- [폴더 구조](Docs/FolderStructure.md)
+- [공개 API·모델·샘플 사용법](MediaPipeUnityDOTS/Assets/MediaPipeUnityDots/README.md)
+- [변경 내역](MediaPipeUnityDOTS/Assets/MediaPipeUnityDots/CHANGELOG.md)
+- [배포 계획과 검증 기록](Docs/LibraryDistributionPlan.md)
+- [월드 표시 좌표](Docs/transform-to-unity-world.md)
+- [필터 설명](Docs/landmark-noise-filtering.md)
+- [브랜치·PR 규칙](BRANCH_RULE.md)

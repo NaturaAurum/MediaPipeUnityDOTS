@@ -10,6 +10,9 @@ namespace MediaPipeUnityDots.Runtime.Tracking
     /// </summary>
     public sealed class HolisticTrackingSnapshot
     {
+        public const int FaceLandmarkCapacity = MpudHolisticResult.FaceLandmarks;
+        public const int PoseLandmarkCapacity = MpudHolisticResult.PoseLandmarks;
+        public const int HandLandmarkCapacity = MpudHolisticResult.HandLandmarks;
         private readonly MpudNormalizedLandmark[] _faceLandmarks;
         private readonly MpudNormalizedLandmark[] _poseLandmarks;
         private readonly MpudNormalizedLandmark[] _leftHandLandmarks;
@@ -123,11 +126,15 @@ namespace MediaPipeUnityDots.Runtime.Tracking
             return count > capacity ? capacity : count;
         }
 
+        /// 얼굴 normalized image landmark를 caller-owned destination에 복사한다.
+        /// destination은 최소 478 capacity여야 한다. 반환값은 복사된 landmark 수.
         public int CopyFaceTo(MpudNormalizedLandmark[] destination)
         {
             return CopyOut(_faceLandmarks, FaceLandmarkCount, destination);
         }
 
+        /// 포즈 normalized image landmark를 caller-owned destination에 복사한다.
+        /// destination은 최소 33 capacity여야 한다. 반환값은 복사된 landmark 수.
         public int CopyPoseTo(MpudNormalizedLandmark[] destination)
         {
             return CopyOut(_poseLandmarks, PoseLandmarkCount, destination);

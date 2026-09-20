@@ -1,5 +1,7 @@
 # Landmark Noise Filter 알고리즘 분석 및 설계
 
+아래 수식·코드는 알고리즘 설계 설명이다. 현재 배포 구현은 기존 `LandmarkFilterState` 코어, 렌더 독립 `LandmarkFilterSystem`, managed `LandmarkFilterCoordinator`를 사용한다. 실제 API·소유권·연속성·시간 계약은 [패키지 README](../MediaPipeUnityDOTS/Assets/MediaPipeUnityDots/README.md)의 필터 절을 따른다.
+
 MediaPipe 랜드마크(Hand, Face, Pose, Holistic)의 미세 떨림(Jitter)을 억제하고, 실시간 반응성(Low Latency)을 보장하기 위한 노이즈 필터링 알고리즘 조사 및 설계 문서다.
 
 ---
@@ -194,5 +196,5 @@ public static class OneEuroFilterMath
 1. **최적 알고리즘**: **1 Euro Filter**가 지터 억제, 지연 최소화, 연산 효율, Burst/ECS 적합성 면에서 압도적으로 최적이다.
 2. **구현 1단계 (Core Math)**: `OneEuroFilterMath` 및 상태 컴포넌트 정의.
 3. **구현 2단계 (ECS Integration)**:
-   - `HandLandmarkRenderSystem`, `FaceLandmarkRenderSystem`, `PoseLandmarkRenderSystem` 직전 또는 내부에서 `Map()` 전 정규화 좌표를 필터링하도록 연계.
+   - 현재 구현은 `LandmarkFilterSystem`에서 별도 정규화/model-world 결과를 발행한다. `LandmarkRenderSystem`은 `Map()`에 이 결과를 전달하며 동일 필터를 다시 적용하지 않는다.
 4. **구현 3단계 (Z축 독립 튜닝)**: X/Y 평면 대비 Z축의 $f_{c_{min}}$을 낮추어 깊이 튀는 현상 집중 완화.

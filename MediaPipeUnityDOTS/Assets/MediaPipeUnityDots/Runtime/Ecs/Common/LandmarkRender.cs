@@ -7,58 +7,37 @@ using Unity.Transforms;
 namespace MediaPipeUnityDots.Runtime.Ecs
 {
     /// <summary>
-    /// 트래커 공통 렌더 계산. 트래커별 시스템은 버퍼에서 원시값만 뽑아 여기로 넘긴다.
-    /// 필터 입력은 (정규화 X, 정규화 Y, 상대 월드 Z)이며 월드 미지원이면 useDepth=0으로 2D 폴백한다.
-    /// 깊이 보정은 기존 필터 이후 표시용 깊이에 대상별 오프셋을 더하며 XY 필터를 건드리지 않는다.
+    /// 트래커 공통 표시 계산. LandmarkFilterSystem이 게시한 filtered 값을 받아 표시 좌표로만 변환한다.
+    /// 깊이 보정은 filtered 결과 이후 표시용 깊이에 대상별 오프셋을 더하며 필터 상태를 소유하지 않는다.
     /// </summary>
     [BurstCompile]
     public static class LandmarkRender
     {
+        /// <summary>
+        /// 이미 필터링된 결과를 표시 좌표로만 변환한다. 여기서는 필터 상태를 전진시키지 않는다.
+        /// </summary>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static void ResolvePoint(
+        public static void ResolveFilteredPoint(
             float imageX,
             float imageY,
             float worldZ,
             float depthScale,
             float depthFarZ,
             int useDepth,
-            ref LandmarkFilterState filter,
-            int filterEnabled,
-            float3 minCutoff,
-            float3 beta,
-            float derivativeCutoffHz,
-            long timestampUs,
             float depthCorrection,
             int useCorrection,
             in LandmarkOverlayMapping mapping,
             out float3 targetPos)
         {
-            if (filter.Mode != useDepth)
-            {
-                filter.Initialized = 0;
-                filter.Mode = useDepth;
-            }
-
-            // 원점·앵커 변화 대신 최후방 점 기준의 상대 깊이를 필터링한다.
-            var relativeDepth = useDepth != 0 ? worldZ - depthFarZ : 0f;
-            var filtered = OneEuroFilter.Filter(
-                new float3(imageX, imageY, relativeDepth),
-                ref filter,
-                filterEnabled,
-                minCutoff,
-                beta,
-                derivativeCutoffHz,
-                timestampUs);
-            var depth = useDepth != 0 ? math.min(filtered.z, 0f) * depthScale : 0f;
+            var depth = useDepth != 0 ? math.min(worldZ - depthFarZ, 0f) * depthScale : 0f;
             if (useDepth != 0 && useCorrection != 0)
             {
                 depth += depthCorrection;
             }
 
-            // 3D는 평면 XY + 전방 깊이로 형태를 보존한다. 광선별 확대·점별 클리핑은 쓰지 않는다.
             targetPos = useDepth != 0
-                ? LandmarkOverlayMapping.MapShapePreserving(filtered.x, filtered.y, depth, in mapping)
-                : LandmarkOverlayMapping.MapWithDepth(filtered.x, filtered.y, depth, in mapping);
+                ? LandmarkOverlayMapping.MapShapePreserving(imageX, imageY, depth, in mapping)
+                : LandmarkOverlayMapping.MapWithDepth(imageX, imageY, depth, in mapping);
         }
 
         /// <summary>
@@ -114,9 +93,8 @@ namespace MediaPipeUnityDots.Runtime.Ecs
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static void HidePoint(ref LocalTransform transform, ref LandmarkFilterState filter)
+        public static void HidePoint(ref LocalTransform transform)
         {
-            filter.Initialized = 0;
             var hidden = transform;
             hidden.Scale = 0f;
             transform = hidden;

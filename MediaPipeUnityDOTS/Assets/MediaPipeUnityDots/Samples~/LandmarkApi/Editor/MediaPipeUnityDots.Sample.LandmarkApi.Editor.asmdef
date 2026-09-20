@@ -1,0 +1,17 @@
+{
+    "name": "MediaPipeUnityDots.Sample.LandmarkApi.Editor",
+    "rootNamespace": "MediaPipeUnityDots.Sample.LandmarkApi.Editor",
+    "references": [
+        "MediaPipeUnityDots.Runtime",
+        "MediaPipeUnityDots.Sample.LandmarkApi"
+    ],
+    "includePlatforms": ["Editor"],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": false,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

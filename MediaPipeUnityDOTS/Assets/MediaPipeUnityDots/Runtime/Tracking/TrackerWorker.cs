@@ -65,11 +65,35 @@ namespace MediaPipeUnityDots.Runtime.Tracking
         private bool _resetRequested;
         private bool _stopRequested;
         private bool _faulted;
+        private string _faultError;
         private bool _disposed;
         private bool _started;
         private long _generation;
         private Exception _createError;
         private string _shutdownError;
+
+        public bool IsFaulted
+        {
+            get
+            {
+                lock (_gate)
+                {
+                    return _faulted;
+                }
+            }
+        }
+
+        public string FaultError
+        {
+            get
+            {
+                lock (_gate)
+                {
+                    return _faultError;
+                }
+            }
+        }
+
 
         public TrackerWorker(string name, ITrackerWorkerBody<TCompletion> body, int createTimeoutMs = 10000)
         {
@@ -294,11 +318,17 @@ namespace MediaPipeUnityDots.Runtime.Tracking
                         if (resetError != null)
                         {
                             _faulted = true;
+                            _faultError = resetError;
                             if (!_stopRequested && item.Generation == _generation)
                             {
                                 _completed = new Completion { Error = resetError, Generation = item.Generation };
                                 _hasCompleted = true;
                             }
+                        }
+                        else
+                        {
+                            _faulted = false;
+                            _faultError = null;
                         }
                     }
                     continue;
@@ -327,6 +357,12 @@ namespace MediaPipeUnityDots.Runtime.Tracking
                 {
                     _workerBusy = false;
                     // 검사와 게시를 같은 임계 구역에서 수행해 Reset과의 경쟁을 막는다.
+                    if (error != null)
+                    {
+                        _faulted = true;
+                        _faultError = error;
+                    }
+
                     if (!_stopRequested && item.Generation == _generation && (ok || error != null))
                     {
                         _completed = new Completion

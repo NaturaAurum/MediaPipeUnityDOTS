@@ -95,7 +95,6 @@ namespace MediaPipeUnityDots.Runtime.Ecs
                             Target = t,
                             Index = i,
                         });
-                        entityManager.AddComponentData(entity, new LandmarkFilterState());
                         entityManager.AddComponentData(entity, new LandmarkDepthCorrection());
                         entityManager.AddComponentData(
                             entity,
