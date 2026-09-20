@@ -1,0 +1,106 @@
+MediaPipeUnityDots macOS arm64 native bundle
+architecture: arm64
+bundle-bytes: 45401664
+bundle-files: 12
+system-frameworks: provided by macOS (not bundled)
+mediapipe-commit: 6d31f1ebc3284db74d211d62bdc4f0a0c29ea120
+bazel-version: 7.4.1
+minimum-macos: 26.0
+bundle: libgcc_s.1.1.dylib
+source: gcc
+size: 219600
+sha256: 01d4c79a06a41b8ba054a64dd4401421271274ab7b0ea8473e7e399ca1992d98
+bundle: libgfortran.5.dylib
+source: gcc
+size: 2186928
+sha256: efd4b39f6fc6c9c36643855ebf9c047eca4f4fc9880d389ca6c3098c927d1ed7
+bundle: libmpud_bridge.dylib
+source: bridge
+size: 14576160
+sha256: 72cd9fc49b3354f5198aa7383b2c11d3bba42115b18fd849cfb4261af6080a6c
+bundle: libomp.dylib
+source: libomp
+size: 739760
+sha256: e68ca7a22a98edfb48a59420445dad862132d8232b416e37cd894e24d812646d
+bundle: libopenblasp-r0.3.34.dylib
+source: openblas
+size: 16009904
+sha256: 095ef77c6f40a7ddd757212ddded7ed7da521668db354e132a50c1791af4e82c
+bundle: libopencv_calib3d.4.14.0.dylib
+source: opencv@4
+size: 2072368
+sha256: fc76b5def7561885990d503c398e43dffdb9c5022175b779c30ae0ec1c40a824
+bundle: libopencv_core.4.14.0.dylib
+source: opencv@4
+size: 3383840
+sha256: e4a49091f36f364ee15bff2fd691df3e71aba4548e077ae4ba0a430b603fd2af
+bundle: libopencv_features2d.4.14.0.dylib
+source: opencv@4
+size: 768656
+sha256: cafea34f022a03bfe3d77b6a0c2b2812d46424727b4c5bd1a78dfa327938c366
+bundle: libopencv_flann.4.14.0.dylib
+source: opencv@4
+size: 441360
+sha256: 048232c8457c526d2f44fdd5d82d2815c3d5e0d56bda0bc2d0cc349b6bd21840
+bundle: libopencv_imgproc.4.14.0.dylib
+source: opencv@4
+size: 4303072
+sha256: 584c6be4c6e04c46254ba646eff084dd742a0d711494532424acdcf29caca05a
+bundle: libquadmath.0.dylib
+source: gcc
+size: 360752
+sha256: e4d557cc80901b8786e3cea5062307b50fae95f6af8817e215852e3702ea4f6e
+bundle: libtbb.12.19.dylib
+source: tbb
+size: 339264
+sha256: b2a38418276b7ef704c3a460785013b7d208e86d55a8bbfec07596cf046947c3
+build-input: Bridge/BazelOverlay/BUILD sha256=ebd3f07bcf4f96c2204fc16509e990b5db40516202aab0537395f77d78e96c5a
+build-input: Bridge/Include/mpud_bridge.h sha256=faf12a2daad9c821994795894f5496617fc206382d79994b45cb662448ad8b2e
+build-input: Bridge/Include/mpud_face_bridge.h sha256=cd93f712361b4e0cb10d9a1ca65301693b4adfdd9bb46ed6975c39a298328db9
+build-input: Bridge/Include/mpud_holistic_bridge.h sha256=3f00a6b6122cf48ab09ee8939cf38ad757871a09f29349334d2529b4ecf25b44
+build-input: Bridge/Include/mpud_pose_bridge.h sha256=f69caa52ef19597239de0b7bb4cd636f04c7d85303175e8c410cc1a8cf7c9469
+build-input: Bridge/Src/mpud_bridge.cc sha256=680bd153f64d4b6554c691e62db6640a6b7e0e8179a93967c02bb82cdec5ab5c
+build-input: Bridge/Src/mpud_face_bridge.cc sha256=6a14a9a42ae262a54d835e43ca176027a28f050a8edd117f535d1eaa51b45e37
+build-input: Bridge/Src/mpud_holistic_bridge.cc sha256=359f6f0af755f73edda9e141e41f22e1604c481c1a79aeed5eb743690333ae32
+build-input: Bridge/Src/mpud_pose_bridge.cc sha256=dcc7171da9979ff408884055954ce1a9b5ea5ff24b1897a570d24de2806efdd6
+build-input: Bridge/Src/mpud_smoke_test.cc sha256=986d6262d16b5996ff0449edb946182e34348006c6c8e751ff12c0ecddda859d
+build-input: Build/.bazelrc sha256=934fc6774641b0f608f8af52d2732836124acfa7abd842fc84423b458a317fd0
+build-input: Build/BuildMacosEditor.sh sha256=fa93457cb89d42a76a978e4e887b3bc9bfc616e2502ec48c83794089b7232cc2
+build-input: Build/CopyArtifactsToUnity.sh sha256=0d4db0ca69f6d1df5aafe33a2bad06c672b6185f86ebf3f6bfe26f2118eeb58a
+build-input: Build/DownloadModels.sh sha256=8194bcb9e7a70ecc371ade5b1aa937f7dc2a930da62ad350fdc41959ebc56ff8
+build-input: Build/HomebrewRecipeLicense.txt sha256=f80329e58613ad669c0e73cb132d8060b9b2c55e339c73848068e4d1567f4627
+build-input: Build/PackageMacosNative.py sha256=5407ff782d91503562c7138ebc0ea813d909ba5057f1a5e369d6468f0d1310db
+build-input: Build/PackageMacosNative.sh sha256=98f7fdf43fa5f967b365d3b99a04f71631f37d765b7c66e240b6fe4945a80dbd
+build-input: Build/SyncBridgeIntoWorkspace.sh sha256=b2955f2676926863dac2198680430ee8dd1778fae04cccb328618b26af7a9c37
+build-input: Patches/mediapipe/macos_arm64_compat.diff sha256=3c7a7555f2d67186448348bb731dd3fc15f500a1c3bbbcbf3a39137617baa890
+build-input: Patches/mediapipe/module_compat.diff sha256=1cd130eb954eca9839354bab0d6e059343bf746526ff0ba770ea2d2171016377
+build-input: Patches/mediapipe/opencv_minimal_macos.diff sha256=d04f4000d03cff343e56ce047cd4435e578b6c7a40c42d0e13547afd163667b6
+license-files:
+  ThirdPartyLicenses/gcc.txt
+  ThirdPartyLicenses/homebrew-recipes.txt
+  ThirdPartyLicenses/libomp.txt
+  ThirdPartyLicenses/mediapipe.txt
+  ThirdPartyLicenses/openblas.txt
+  ThirdPartyLicenses/opencv-4.txt
+  ThirdPartyLicenses/static-abseil-cpp.txt
+  ThirdPartyLicenses/static-com-github-gflags-gflags.txt
+  ThirdPartyLicenses/static-com-github-glog-glog.txt
+  ThirdPartyLicenses/static-cpuinfo.txt
+  ThirdPartyLicenses/static-eigen-archive.txt
+  ThirdPartyLicenses/static-eigen.txt
+  ThirdPartyLicenses/static-farmhash-archive.txt
+  ThirdPartyLicenses/static-fft2d.txt
+  ThirdPartyLicenses/static-flatbuffers.txt
+  ThirdPartyLicenses/static-fp16.txt
+  ThirdPartyLicenses/static-fxdiv.txt
+  ThirdPartyLicenses/static-gemmlowp.txt
+  ThirdPartyLicenses/static-kleidiai.txt
+  ThirdPartyLicenses/static-local-tsl.txt
+  ThirdPartyLicenses/static-local-xla.txt
+  ThirdPartyLicenses/static-org-tensorflow.txt
+  ThirdPartyLicenses/static-protobuf.txt
+  ThirdPartyLicenses/static-pthreadpool.txt
+  ThirdPartyLicenses/static-ruy.txt
+  ThirdPartyLicenses/static-xnnpack.txt
+  ThirdPartyLicenses/static-zlib.txt
+  ThirdPartyLicenses/tbb.txt
