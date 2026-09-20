@@ -11,20 +11,25 @@ namespace MediaPipeUnityDots.Runtime.Tracking
         private const int Capacity = 32;
 
         private readonly Dictionary<long, CaptureStamp> _map = new();
-        private readonly Queue<long> _order = new();
 
         public void Register(long timestampUs, CaptureStamp stamp)
         {
-            if (!_map.ContainsKey(timestampUs))
+            _map[timestampUs] = stamp;
+            if (_map.Count <= Capacity)
             {
-                _order.Enqueue(timestampUs);
+                return;
             }
 
-            _map[timestampUs] = stamp;
-            while (_map.Count > Capacity && _order.Count > 0)
+            var oldestTimestamp = long.MaxValue;
+            foreach (var candidate in _map.Keys)
             {
-                _map.Remove(_order.Dequeue());
+                if (candidate < oldestTimestamp)
+                {
+                    oldestTimestamp = candidate;
+                }
             }
+
+            _map.Remove(oldestTimestamp);
         }
 
         public bool TryTake(long timestampUs, out CaptureStamp stamp)
@@ -42,7 +47,6 @@ namespace MediaPipeUnityDots.Runtime.Tracking
         public void Clear()
         {
             _map.Clear();
-            _order.Clear();
         }
     }
 }

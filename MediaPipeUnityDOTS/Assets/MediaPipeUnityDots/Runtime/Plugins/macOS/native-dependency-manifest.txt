@@ -6,6 +6,7 @@ system-frameworks: provided by macOS (not bundled)
 mediapipe-commit: 6d31f1ebc3284db74d211d62bdc4f0a0c29ea120
 bazel-version: 7.4.1
 minimum-macos: 26.0
+build-input-set-sha256: 4677c13cbfd7d43dc06e4803f3dd12406a7740b5a6a448a3b7ec1232acc81510
 bundle: libgcc_s.1.1.dylib
 source: gcc
 size: 219600
@@ -65,11 +66,11 @@ build-input: Bridge/Src/mpud_holistic_bridge.cc sha256=359f6f0af755f73edda9e141e
 build-input: Bridge/Src/mpud_pose_bridge.cc sha256=dcc7171da9979ff408884055954ce1a9b5ea5ff24b1897a570d24de2806efdd6
 build-input: Bridge/Src/mpud_smoke_test.cc sha256=986d6262d16b5996ff0449edb946182e34348006c6c8e751ff12c0ecddda859d
 build-input: Build/.bazelrc sha256=934fc6774641b0f608f8af52d2732836124acfa7abd842fc84423b458a317fd0
-build-input: Build/BuildMacosEditor.sh sha256=fa93457cb89d42a76a978e4e887b3bc9bfc616e2502ec48c83794089b7232cc2
+build-input: Build/BuildMacosEditor.sh sha256=193ad0ad980ed5b976af058ed8ecf9ee68b1c76415c0d69f8e14abc0537f88e7
 build-input: Build/CopyArtifactsToUnity.sh sha256=0d4db0ca69f6d1df5aafe33a2bad06c672b6185f86ebf3f6bfe26f2118eeb58a
 build-input: Build/DownloadModels.sh sha256=8194bcb9e7a70ecc371ade5b1aa937f7dc2a930da62ad350fdc41959ebc56ff8
 build-input: Build/HomebrewRecipeLicense.txt sha256=f80329e58613ad669c0e73cb132d8060b9b2c55e339c73848068e4d1567f4627
-build-input: Build/PackageMacosNative.py sha256=5407ff782d91503562c7138ebc0ea813d909ba5057f1a5e369d6468f0d1310db
+build-input: Build/PackageMacosNative.py sha256=923452fd977cec95d9016b0e921d3b3a944633f33cea501dfa4a50b058a93234
 build-input: Build/PackageMacosNative.sh sha256=98f7fdf43fa5f967b365d3b99a04f71631f37d765b7c66e240b6fe4945a80dbd
 build-input: Build/SyncBridgeIntoWorkspace.sh sha256=b2955f2676926863dac2198680430ee8dd1778fae04cccb328618b26af7a9c37
 build-input: Patches/mediapipe/macos_arm64_compat.diff sha256=3c7a7555f2d67186448348bb731dd3fc15f500a1c3bbbcbf3a39137617baa890

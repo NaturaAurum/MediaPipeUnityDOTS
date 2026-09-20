@@ -3,6 +3,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 NATIVE_DIR="$(dirname "$SCRIPT_DIR")"
 UPSTREAM_MP="$NATIVE_DIR/Upstream/mediapipe"
+EXPECTED_MEDIAPIPE_COMMIT="6d31f1ebc3284db74d211d62bdc4f0a0c29ea120"
 
 BAZEL_CMD="bazelisk"
 if ! command -v "$BAZEL_CMD" >/dev/null 2>&1; then
@@ -69,6 +70,12 @@ download_distdir_archive \
 
 BAZEL_STARTUP_FLAGS=(--bazelrc="$SCRIPT_DIR/.bazelrc")
 BAZEL_FETCH_FLAGS=(--distdir="$DISTDIR")
+
+ACTUAL_MEDIAPIPE_COMMIT="$(git -C "$UPSTREAM_MP" rev-parse HEAD 2>/dev/null || true)"
+if [ "$ACTUAL_MEDIAPIPE_COMMIT" != "$EXPECTED_MEDIAPIPE_COMMIT" ]; then
+    echo "[Error] MediaPipe HEAD is '$ACTUAL_MEDIAPIPE_COMMIT' but expected '$EXPECTED_MEDIAPIPE_COMMIT'." >&2
+    exit 1
+fi
 
 "$SCRIPT_DIR/SyncBridgeIntoWorkspace.sh"
 
@@ -214,5 +221,9 @@ if [ -f "$NATIVE_DIR/Artifacts/MacosEditor/libmpud_bridge.dylib" ]; then
 fi
 cp "$BAZEL_BIN/mediapipe/mpud_bridge/libmpud_bridge.dylib" \
    "$NATIVE_DIR/Artifacts/MacosEditor/"
+python3 "$SCRIPT_DIR/PackageMacosNative.py" \
+    --artifact "$NATIVE_DIR/Artifacts/MacosEditor/libmpud_bridge.dylib" \
+    --upstream "$UPSTREAM_MP" \
+    --record-build-inputs
 
 echo "[Build] Complete: $NATIVE_DIR/Artifacts/MacosEditor/libmpud_bridge.dylib"

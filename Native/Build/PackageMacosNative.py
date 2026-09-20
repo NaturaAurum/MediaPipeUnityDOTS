@@ -26,6 +26,11 @@ SYSTEM_PREFIXES = (
 FORMULA_ROOTS = ("/opt/homebrew", "/usr/local")
 LICENSE_PREFIXES = ("license", "licence", "copying", "notice", "copyright", "patent")
 LICENSE_SUFFIXES_TO_SKIP = (".html", ".htm", ".3ssl", ".1", ".pod")
+COMPILED_INPUT_FILES = (
+    "Build/.bazelrc",
+    "Build/BuildMacosEditor.sh",
+    "Build/SyncBridgeIntoWorkspace.sh",
+)
 
 
 class PackagingError(RuntimeError):
@@ -53,6 +58,45 @@ def sha256_file(path: Path) -> str:
         for chunk in iter(lambda: stream.read(1024 * 1024), b""):
             digest.update(chunk)
     return digest.hexdigest()
+
+def build_input_digest(upstream_root: Path) -> str:
+    native_root = Path(__file__).resolve().parent.parent
+    records: list[str] = []
+    for directory in ("Bridge", "Patches"):
+        for source in sorted((native_root / directory).rglob("*")):
+            if source.is_file() and "__pycache__" not in source.parts:
+                records.append(f"{source.relative_to(native_root)} sha256={sha256_file(source)}")
+    for relative in COMPILED_INPUT_FILES:
+        source = native_root / relative
+        records.append(f"{relative} sha256={sha256_file(source)}")
+    records.append(f"mediapipe-commit={run('git', 'rev-parse', 'HEAD', cwd=upstream_root, capture=True).strip()}")
+    return hashlib.sha256(("\n".join(records) + "\n").encode()).hexdigest()
+
+
+def build_input_record(artifact: Path, upstream_root: Path) -> str:
+    return (
+        f"artifact-sha256={sha256_file(artifact)}\n"
+        f"build-input-set-sha256={build_input_digest(upstream_root)}\n"
+    )
+
+
+def build_input_record_path(artifact: Path) -> Path:
+    return artifact.with_name(artifact.name + ".build-inputs")
+
+
+def write_build_input_record(artifact: Path, upstream_root: Path) -> None:
+    if not artifact.is_file():
+        raise PackagingError(f"빌드 산출물이 없습니다: {artifact}")
+    build_input_record_path(artifact).write_text(build_input_record(artifact, upstream_root), encoding="utf-8")
+
+
+def verify_build_input_record(artifact: Path, upstream_root: Path) -> None:
+    record = build_input_record_path(artifact)
+    if not record.is_file():
+        raise PackagingError(f"빌드 입력 기록이 없습니다: {record}\n먼저 BuildMacosEditor.sh를 실행하세요.")
+    expected = build_input_record(artifact, upstream_root)
+    if record.read_text(encoding="utf-8") != expected:
+        raise PackagingError("네이티브 빌드 입력이 산출물 생성 후 변경되었습니다. BuildMacosEditor.sh를 다시 실행하세요.")
 
 
 def macho_dependencies(path: Path) -> list[str]:
@@ -492,6 +536,7 @@ def write_manifest(
         f"mediapipe-commit: {run('git', 'rev-parse', 'HEAD', cwd=upstream_root, capture=True).strip()}",
         f"bazel-version: {(upstream_root / '.bazelversion').read_text().strip()}",
         "minimum-macos: " + ".".join(map(str, max(minimum_versions))),
+        f"build-input-set-sha256: {build_input_digest(upstream_root)}",
     ]
     for source in sorted(files, key=lambda item: source_to_name[item]):
         path = destination / source_to_name[source]
@@ -523,6 +568,7 @@ def package(root: Path, destination: Path, upstream_root: Path) -> None:
         raise PackagingError("otool, install_name_tool, codesign이 필요합니다.")
     if not root.is_file():
         raise PackagingError(f"빌드 산출물이 없습니다: {root}\n먼저 BuildMacosEditor.sh를 실행하세요.")
+    verify_build_input_record(root, upstream_root)
 
     files, source_to_name, known_by_name = collect_graph(root)
     destination.mkdir(parents=True, exist_ok=True)
@@ -539,9 +585,14 @@ def package(root: Path, destination: Path, upstream_root: Path) -> None:
         clean_old_bundle(destination, manifest, root.name)
         copy_stage(stage, destination, files, source_to_name, root.name)
         target_licenses = destination / "ThirdPartyLicenses"
-        if target_licenses.exists():
-            shutil.rmtree(target_licenses)
-        shutil.copytree(stage / "ThirdPartyLicenses", target_licenses)
+        target_licenses.mkdir(exist_ok=True)
+        staged_licenses = {path.name: path for path in (stage / "ThirdPartyLicenses").glob("*.txt")}
+        for installed in target_licenses.glob("*.txt"):
+            if installed.name not in staged_licenses:
+                installed.unlink()
+                installed.with_suffix(installed.suffix + ".meta").unlink(missing_ok=True)
+        for name, source in staged_licenses.items():
+            shutil.copy2(source, target_licenses / name)
         shutil.copy2(stage / "THIRD_PARTY_LICENSES.txt", destination / "THIRD_PARTY_LICENSES.txt")
         write_manifest(destination, files, source_to_name, sorted(target_licenses.glob("*.txt")), upstream_root)
 
@@ -554,10 +605,16 @@ def package(root: Path, destination: Path, upstream_root: Path) -> None:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--artifact", type=Path, required=True)
-    parser.add_argument("--destination", type=Path, required=True)
+    parser.add_argument("--destination", type=Path)
     parser.add_argument("--upstream", type=Path, required=True)
+    parser.add_argument("--record-build-inputs", action="store_true")
     args = parser.parse_args()
     try:
+        if args.record_build_inputs:
+            write_build_input_record(args.artifact, args.upstream)
+            return 0
+        if args.destination is None:
+            parser.error("--destination is required unless --record-build-inputs is used")
         package(args.artifact, args.destination, args.upstream)
     except (OSError, PackagingError, subprocess.CalledProcessError) as error:
         print(f"[Error] {error}", file=sys.stderr)

@@ -3,6 +3,7 @@
     <VisualElement name="filter-settings-panel" class="filter-settings-panel">
         <Foldout text="1 Euro Filter 튜닝" name="filter-foldout" value="true" class="filter-foldout">
             <Toggle name="filter-enabled-toggle" label="1 Euro 필터 활성화" value="true" class="setting-toggle" />
+            <Label text="연속성 토큰이 없으면 안전하게 원본을 그대로 표시합니다." class="filter-status" />
             <Toggle name="verbose-logging-toggle" label="상세 로그" value="false" class="setting-toggle" />
             <Toggle name="render-mode-toggle" label="3D 영상 정합" value="false" class="setting-toggle" />
             <Label text="Hand (손)" class="section-header" />

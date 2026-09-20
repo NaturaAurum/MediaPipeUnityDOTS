@@ -304,9 +304,26 @@ namespace MediaPipeUnityDots.Runtime.Tracking.Filtering
                 return;
             }
 
-            if (_ownsFilter)
+            var previousFilter = _filter;
+            var disposePrevious = _ownsFilter;
+            _hasLastOutput = false;
+            _lastCount = 0;
+            _lastContext = default;
+            _lastOutput = null;
+            _filter = null;
+            _ownsFilter = false;
+            if (disposePrevious)
             {
-                _filter.Dispose();
+                try
+                {
+                    previousFilter.Dispose();
+                }
+                catch
+                {
+                    _disposed = true;
+                    LastResult = LandmarkFilterResult.Disposed;
+                    throw;
+                }
             }
 
             _filter = filter;
@@ -321,18 +338,21 @@ namespace MediaPipeUnityDots.Runtime.Tracking.Filtering
                 return;
             }
 
-            if (_ownsFilter)
-            {
-                _filter.Dispose();
-            }
-
+            var filter = _filter;
+            var ownsFilter = _ownsFilter;
             _filter = null;
+            _ownsFilter = false;
             _lastOutput = null;
+            _lastContext = default;
             _lastCount = 0;
             _hasLastOutput = false;
             _disposed = true;
             LastResult = LandmarkFilterResult.Disposed;
             LastError = null;
+            if (ownsFilter)
+            {
+                filter.Dispose();
+            }
         }
 
         private void EnsureLastOutputCapacity(int count)

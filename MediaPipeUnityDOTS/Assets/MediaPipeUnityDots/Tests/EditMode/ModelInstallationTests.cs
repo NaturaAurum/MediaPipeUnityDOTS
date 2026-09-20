@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using MediaPipeUnityDots.EditorTool;
+using MediaPipeUnityDots.Runtime.Models;
 using NUnit.Framework;
 
 namespace MediaPipeUnityDots.Tests.EditMode
@@ -46,6 +47,28 @@ namespace MediaPipeUnityDots.Tests.EditMode
                 ModelCatalog.CommitVerifiedFile(partial, installed, expected);
                 Assert.AreEqual("verified-version", File.ReadAllText(installed));
                 Assert.IsFalse(File.Exists(partial));
+            }
+            finally
+            {
+                Directory.Delete(directory, true);
+            }
+        }
+
+        [Test]
+        public void ExistingDepthMetadataIsPreserved()
+        {
+            var directory = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(directory);
+            try
+            {
+                var model = Path.Combine(directory, "depth.onnx");
+                var metadata = model + ".meta";
+                const string consumerMetadata = "fileFormatVersion: 2\nguid: 1234567890abcdef1234567890abcdef\nuserData: consumer-setting\n";
+                File.WriteAllText(metadata, consumerMetadata);
+
+                DownloadDepthModel.EnsureImportedMetadata(TrackingModel.Depth, model);
+
+                Assert.AreEqual(consumerMetadata, File.ReadAllText(metadata));
             }
             finally
             {
