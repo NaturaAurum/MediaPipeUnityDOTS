@@ -1,4 +1,5 @@
 using System.Threading;
+using MediaPipeUnityDots.Runtime.Models;
 using MediaPipeUnityDots.Runtime.Tracking;
 using NUnit.Framework;
 using Unity.InferenceEngine;
@@ -19,7 +20,7 @@ namespace MediaPipeUnityDots.Tests.EditMode
         public void ImportScheduleReadback_ProducesFiniteVaryingMap()
         {
             var asset = AssetDatabase.LoadAssetAtPath<ModelAsset>(
-                "Assets/MediaPipeUnityDots/Models/depth_anything_v2_small.onnx");
+                ModelPaths.DepthAssetPath);
             if (asset == null)
             {
                 Assert.Ignore("Run MediaPipe/Download Depth Model (DA-V2 Small) first.");

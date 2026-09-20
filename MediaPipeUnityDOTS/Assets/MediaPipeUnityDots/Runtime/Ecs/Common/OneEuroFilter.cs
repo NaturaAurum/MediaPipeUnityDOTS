@@ -26,6 +26,11 @@ namespace MediaPipeUnityDots.Runtime.Ecs
     public static class OneEuroFilter
     {
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static void Reset(ref LandmarkFilterState state)
+        {
+            state = default;
+        }
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static float3 Filter(
             float3 current,
             ref LandmarkFilterState state,

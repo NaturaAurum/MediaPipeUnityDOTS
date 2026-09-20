@@ -53,6 +53,10 @@ namespace MediaPipeUnityDots.Runtime.Tracking
 
             var status = entityManager.GetComponentData<HandTrackingStatus>(_cachedEntity);
             var buffer = entityManager.GetBuffer<LandmarkElement>(_cachedEntity);
+            var hasWorldBuffer = entityManager.HasBuffer<HandWorldLandmarkElement>(_cachedEntity);
+            var worldBuffer = hasWorldBuffer
+                ? entityManager.GetBuffer<HandWorldLandmarkElement>(_cachedEntity)
+                : default;
 
             var handCount = status.HandCount;
             if (handCount < 0)
@@ -65,10 +69,13 @@ namespace MediaPipeUnityDots.Runtime.Tracking
             }
 
             destination.IsValid = status.IsValid;
+            destination.ResultStatus = status.ResultStatus;
             destination.HandCount = handCount;
             destination.TimestampUs = status.TimestampUs;
             destination.FrameCount = status.FrameCount;
-
+            destination.CaptureId = status.CaptureId;
+            destination.CaptureTimestampUs = status.CaptureTimestampUs;
+            destination.CaptureEpoch = status.CaptureEpoch;
             var totalPoints = 0;
             for (var h = 0; h < HandTrackingDto.MaxHands; h++)
             {
@@ -77,6 +84,7 @@ namespace MediaPipeUnityDots.Runtime.Tracking
                     destination.Handedness[h] = -1;
                     destination.Scores[h] = 0f;
                     destination.PointCounts[h] = 0;
+                    destination.WorldPointCounts[h] = 0;
                     continue;
                 }
 
@@ -99,7 +107,30 @@ namespace MediaPipeUnityDots.Runtime.Tracking
                     count++;
                 }
 
+                var worldCount = 0;
+                if (hasWorldBuffer)
+                {
+                    for (var i = 0; i < HandTrackingDto.LandmarkCapacity; i++)
+                    {
+                        var bufferIndex = h * HandTrackingDto.LandmarkCapacity + i;
+                        if (bufferIndex >= worldBuffer.Length)
+                        {
+                            break;
+                        }
+
+                        var element = worldBuffer[bufferIndex];
+                        if (element.HandIndex != h)
+                        {
+                            break;
+                        }
+
+                        destination.WorldPoints[bufferIndex] = new Vector3(element.X, element.Y, element.Z);
+                        worldCount++;
+                    }
+                }
+
                 destination.PointCounts[h] = count;
+                destination.WorldPointCounts[h] = worldCount;
                 totalPoints += count;
                 destination.Handedness[h] = h < status.HandednessList.Length ? status.HandednessList[h] : -1;
                 destination.Scores[h] = h < status.ScoreList.Length ? status.ScoreList[h] : 0f;
@@ -118,16 +149,21 @@ namespace MediaPipeUnityDots.Runtime.Tracking
         private static void WriteEmpty(HandTrackingDto destination, long timestampUs, long frameCount)
         {
             destination.IsValid = false;
+            destination.ResultStatus = TrackingResultStatus.Waiting;
             destination.HandCount = 0;
             destination.PointCount = 0;
             destination.TimestampUs = timestampUs;
             destination.FrameCount = frameCount;
+            destination.CaptureId = 0;
+            destination.CaptureTimestampUs = 0;
+            destination.CaptureEpoch = 0;
 
             for (var h = 0; h < HandTrackingDto.MaxHands; h++)
             {
                 destination.Handedness[h] = -1;
                 destination.Scores[h] = 0f;
                 destination.PointCounts[h] = 0;
+                destination.WorldPointCounts[h] = 0;
             }
         }
     }

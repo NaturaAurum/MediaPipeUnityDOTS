@@ -48,7 +48,8 @@ namespace MediaPipeUnityDots.Runtime.Interop
             CheckHand(hand);
             fixed (float* data = handData)
             {
-                return *(int*)(data + hand * FloatsPerHand);
+                var count = *(int*)(data + hand * FloatsPerHand);
+                return ClampCount(count, LandmarksPerHand);
             }
         }
 
@@ -105,6 +106,16 @@ namespace MediaPipeUnityDots.Runtime.Interop
             };
         }
 
+        private static int ClampCount(int count, int capacity)
+        {
+            if (count < 0)
+            {
+                return 0;
+            }
+
+            return count > capacity ? capacity : count;
+        }
+
         private static void CheckHand(int hand)
         {
             if (hand < 0 || hand >= MaxHands)
@@ -137,7 +148,8 @@ namespace MediaPipeUnityDots.Runtime.Interop
             CheckFace(face);
             fixed (float* data = faceData)
             {
-                return *(int*)(data + face * FloatsPerFace);
+                var count = *(int*)(data + face * FloatsPerFace);
+                return ClampCount(count, LandmarksPerFace);
             }
         }
 
@@ -165,7 +177,8 @@ namespace MediaPipeUnityDots.Runtime.Interop
             CheckFace(face);
             fixed (float* data = faceData)
             {
-                return *(int*)(data + face * FloatsPerFace + 1 + LandmarksPerFace * 5);
+                var count = *(int*)(data + face * FloatsPerFace + 1 + LandmarksPerFace * 5);
+                return ClampCount(count, BlendshapesPerFace);
             }
         }
 
@@ -186,6 +199,16 @@ namespace MediaPipeUnityDots.Runtime.Interop
             {
                 throw new ArgumentOutOfRangeException(nameof(face));
             }
+        }
+
+        private static int ClampCount(int count, int capacity)
+        {
+            if (count < 0)
+            {
+                return 0;
+            }
+
+            return count > capacity ? capacity : count;
         }
     }
 
@@ -241,7 +264,8 @@ namespace MediaPipeUnityDots.Runtime.Interop
             CheckPose(pose);
             fixed (float* data = poseData)
             {
-                return *(int*)(data + pose * FloatsPerPose);
+                var count = *(int*)(data + pose * FloatsPerPose);
+                return ClampCount(count, LandmarksPerPose);
             }
         }
 
@@ -289,6 +313,16 @@ namespace MediaPipeUnityDots.Runtime.Interop
             {
                 throw new ArgumentOutOfRangeException(nameof(pose));
             }
+        }
+
+        private static int ClampCount(int count, int capacity)
+        {
+            if (count < 0)
+            {
+                return 0;
+            }
+
+            return count > capacity ? capacity : count;
         }
     }
 

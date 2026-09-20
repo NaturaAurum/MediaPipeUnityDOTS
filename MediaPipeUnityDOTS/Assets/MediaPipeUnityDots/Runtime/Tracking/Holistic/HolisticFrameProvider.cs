@@ -3,6 +3,7 @@ using System.IO;
 using MediaPipeUnityDots.Runtime.Ecs;
 using MediaPipeUnityDots.Runtime.Interop;
 using MediaPipeUnityDots.Runtime.Tracking;
+using MediaPipeUnityDots.Runtime.Models;
 using Unity.Entities;
 using UnityEngine;
 
@@ -24,6 +25,8 @@ namespace MediaPipeUnityDots.Runtime.Tracking
         private float _minPresenceConfidence = 0.5f;
         [SerializeField]
         private int _logIntervalFrames = 60;
+        [SerializeField]
+        private string _modelPath;
 
         // 전담 프로바이더와 같은 싱글턴에 쓰면 깜빡거린다. 소유자가 따로 있으면 꺼라.
         [SerializeField]
@@ -80,17 +83,23 @@ namespace MediaPipeUnityDots.Runtime.Tracking
             {
                 return;
             }
-
-            if (_service.TryTakeCompleted())
+            var resultStatus = _service.Poll();
+            if (resultStatus != TrackingResultStatus.Waiting)
             {
-                if (MpudLog.Enabled && _logIntervalFrames > 0 && _submitCount % _logIntervalFrames == 0)
+                if (resultStatus == TrackingResultStatus.Success
+                    || resultStatus == TrackingResultStatus.NoDetection)
                 {
-                    MpudLog.Log(
-                        $"[MPUD] Holistic frame #{_service.LatestFrameCount} | Valid={_service.LatestIsValid} | Face={_service.LatestFaceLandmarkCount} Pose={_service.LatestPoseLandmarkCount} L={_service.LatestLeftHandLandmarkCount} R={_service.LatestRightHandLandmarkCount} | ts={_service.LatestTimestampUs}");
+                    if (MpudLog.Enabled && _logIntervalFrames > 0 && _submitCount % _logIntervalFrames == 0)
+                    {
+                        MpudLog.Log(
+                            $"[MPUD] Holistic frame #{_service.LatestFrameCount} | Status={resultStatus} | Face={_service.LatestFaceLandmarkCount} Pose={_service.LatestPoseLandmarkCount} L={_service.LatestLeftHandLandmarkCount} R={_service.LatestRightHandLandmarkCount} | ts={_service.LatestTimestampUs}");
+                    }
                 }
 
                 if (TryGetEntityManager(out var entityManager)
-                    && _service.LatestTimestampUs > _lastCopiedTimestamp)
+                    && (resultStatus == TrackingResultStatus.Error
+                        || resultStatus == TrackingResultStatus.Stale
+                        || _service.LatestTimestampUs > _lastCopiedTimestamp))
                 {
                     PushAllToEcs(entityManager);
                     _lastCopiedTimestamp = _service.LatestTimestampUs;
@@ -131,14 +140,12 @@ namespace MediaPipeUnityDots.Runtime.Tracking
                 return;
             }
 
-            var modelPath = Path.Combine(
-                Application.streamingAssetsPath,
-                "MediaPipe",
-                "Models",
-                "holistic_landmarker.task");
+            var modelPath = string.IsNullOrWhiteSpace(_modelPath)
+                ? ModelPaths.GetPath(TrackingModel.Holistic)
+                : _modelPath;
             if (!File.Exists(modelPath))
             {
-                throw new FileNotFoundException("holistic_landmarker.task was not found.", modelPath);
+                throw new FileNotFoundException("holistic model was not found.", modelPath);
             }
 
             _service = new HolisticTrackingService(modelPath, _minDetectionConfidence, _minPresenceConfidence);
@@ -208,6 +215,10 @@ namespace MediaPipeUnityDots.Runtime.Tracking
                         LandmarkCount = count,
                         TimestampUs = _service.LatestTimestampUs,
                         FrameCount = _service.LatestFrameCount,
+                        CaptureId = _service.LatestCaptureId,
+                        CaptureTimestampUs = _service.LatestCaptureTimestampUs,
+                        CaptureEpoch = _service.LatestCaptureEpoch,
+                        ResultStatus = TrackingResultStatus.Success,
                     });
 
                 var landmarks = entityManager.GetBuffer<FaceLandmarkElement>(_faceSingleton);
@@ -231,7 +242,14 @@ namespace MediaPipeUnityDots.Runtime.Tracking
             }
 
             FaceTrackingSingletonUtil.WriteInvalidPolledState(
-                entityManager, _faceSingleton, _service.LatestTimestampUs, _service.LatestFrameCount);
+                entityManager,
+                _faceSingleton,
+                _service.LatestTimestampUs,
+                _service.LatestFrameCount,
+                _service.LatestCaptureId,
+                _service.LatestCaptureTimestampUs,
+                _service.LatestCaptureEpoch,
+                _service.LatestStatus);
         }
 
         private void PushPoseToEcs(EntityManager entityManager)
@@ -251,6 +269,7 @@ namespace MediaPipeUnityDots.Runtime.Tracking
                         CaptureId = _service.LatestCaptureId,
                         CaptureTimestampUs = _service.LatestCaptureTimestampUs,
                         CaptureEpoch = _service.LatestCaptureEpoch,
+                        ResultStatus = TrackingResultStatus.Success,
                     });
 
                 var landmarks = entityManager.GetBuffer<PoseLandmarkElement>(_poseSingleton);
@@ -302,7 +321,14 @@ namespace MediaPipeUnityDots.Runtime.Tracking
             }
 
             PoseTrackingSingletonUtil.WriteInvalidPolledState(
-                entityManager, _poseSingleton, _service.LatestTimestampUs, _service.LatestFrameCount, _service.LatestCaptureId, _service.LatestCaptureTimestampUs, _service.LatestCaptureEpoch);
+                entityManager,
+                _poseSingleton,
+                _service.LatestTimestampUs,
+                _service.LatestFrameCount,
+                _service.LatestCaptureId,
+                _service.LatestCaptureTimestampUs,
+                _service.LatestCaptureEpoch,
+                _service.LatestStatus);
         }
 
         private void PushHandsToEcs(EntityManager entityManager)
@@ -316,7 +342,14 @@ namespace MediaPipeUnityDots.Runtime.Tracking
             if (handCount == 0)
             {
                 HandTrackingSingletonUtil.WriteInvalidPolledState(
-                    entityManager, _handSingleton, _service.LatestTimestampUs, _service.LatestFrameCount, _service.LatestCaptureId, _service.LatestCaptureTimestampUs, _service.LatestCaptureEpoch);
+                    entityManager,
+                    _handSingleton,
+                    _service.LatestTimestampUs,
+                    _service.LatestFrameCount,
+                    _service.LatestCaptureId,
+                    _service.LatestCaptureTimestampUs,
+                    _service.LatestCaptureEpoch,
+                    _service.LatestStatus);
                 return;
             }
 
@@ -332,6 +365,7 @@ namespace MediaPipeUnityDots.Runtime.Tracking
                 CaptureId = _service.LatestCaptureId,
                 CaptureTimestampUs = _service.LatestCaptureTimestampUs,
                 CaptureEpoch = _service.LatestCaptureEpoch,
+                ResultStatus = TrackingResultStatus.Success,
             };
             status.HandednessList.Clear();
             status.ScoreList.Clear();

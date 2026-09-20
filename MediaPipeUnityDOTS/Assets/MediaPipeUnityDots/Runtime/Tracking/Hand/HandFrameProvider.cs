@@ -3,6 +3,7 @@ using System.IO;
 using MediaPipeUnityDots.Runtime.Ecs;
 using MediaPipeUnityDots.Runtime.Interop;
 using Unity.Entities;
+using MediaPipeUnityDots.Runtime.Models;
 using UnityEngine;
 
 namespace MediaPipeUnityDots.Runtime.Tracking
@@ -21,6 +22,8 @@ namespace MediaPipeUnityDots.Runtime.Tracking
         private int _numHands = 2;
         [SerializeField]
         private int _logIntervalFrames = 60;
+        [SerializeField]
+        private string _modelPath;
 
         /// <summary>
         /// 추적할 손 수. HandTrackingService와 포인트 스포너가 공유한다.
@@ -84,21 +87,28 @@ namespace MediaPipeUnityDots.Runtime.Tracking
             }
 
 
-            if (_service.TryTakeCompleted())
+            var resultStatus = _service.Poll();
+            if (resultStatus != TrackingResultStatus.Waiting)
             {
-                if (ShouldLogFrameSummary())
+                if (resultStatus == TrackingResultStatus.Success
+                    || resultStatus == TrackingResultStatus.NoDetection)
                 {
-                    _hasLoggedFrameSummary = true;
-                    _lastLoggedFrameIsValid = _service.LatestIsValid;
-                    _lastLoggedFrameHandedness = _service.LatestHandedness;
-                    _lastLoggedFrameLandmarkCount = _service.LatestLandmarkCount;
+                    if (ShouldLogFrameSummary())
+                    {
+                        _hasLoggedFrameSummary = true;
+                        _lastLoggedFrameIsValid = _service.LatestIsValid;
+                        _lastLoggedFrameHandedness = _service.LatestHandedness;
+                        _lastLoggedFrameLandmarkCount = _service.LatestLandmarkCount;
 
-                    MpudLog.Log(
-                        $"[MPUD] Frame #{_service.LatestFrameCount} | Valid={_service.LatestIsValid} | Hands={_service.LatestHandCount} | Handedness={_service.LatestHandedness} | Score={_service.LatestScore:F2} | Landmarks={_service.LatestLandmarkCount} | ts={_service.LatestTimestampUs}");
+                        MpudLog.Log(
+                            $"[MPUD] Frame #{_service.LatestFrameCount} | Status={resultStatus} | Hands={_service.LatestHandCount} | Handedness={_service.LatestHandedness} | Score={_service.LatestScore:F2} | Landmarks={_service.LatestLandmarkCount} | ts={_service.LatestTimestampUs}");
+                    }
                 }
 
                 if (TryGetEntityManager(out var entityManager)
-                    && _service.LatestTimestampUs > _lastCopiedTimestamp
+                    && (resultStatus == TrackingResultStatus.Error
+                        || resultStatus == TrackingResultStatus.Stale
+                        || _service.LatestTimestampUs > _lastCopiedTimestamp)
                     && EnsureHandOwnership(entityManager))
                 {
                     PushLatestSnapshotToEcs(entityManager);
@@ -141,14 +151,12 @@ namespace MediaPipeUnityDots.Runtime.Tracking
                 return;
             }
 
-            var modelPath = Path.Combine(
-                Application.streamingAssetsPath,
-                "MediaPipe",
-                "Models",
-                "hand_landmarker.task");
+            var modelPath = string.IsNullOrWhiteSpace(_modelPath)
+                ? ModelPaths.GetPath(TrackingModel.Hand)
+                : _modelPath;
             if (!File.Exists(modelPath))
             {
-                throw new FileNotFoundException("hand_landmarker.task was not found.", modelPath);
+                throw new FileNotFoundException("hand model was not found.", modelPath);
             }
 
             _service = new HandTrackingService(modelPath, _numHands);
@@ -217,13 +225,13 @@ namespace MediaPipeUnityDots.Runtime.Tracking
                 _service.LatestFrameCount,
                 _service.LatestCaptureId,
                 _service.LatestCaptureTimestampUs,
-                _service.LatestCaptureEpoch);
+                _service.LatestCaptureEpoch,
+                _service.LatestStatus);
         }
 
         private void WriteValidPolledState(EntityManager entityManager)
         {
             var handCount = _service.LatestHandCount;
-
             var status = new HandTrackingStatus
             {
                 IsValid = true,
@@ -236,6 +244,7 @@ namespace MediaPipeUnityDots.Runtime.Tracking
                 CaptureId = _service.LatestCaptureId,
                 CaptureTimestampUs = _service.LatestCaptureTimestampUs,
                 CaptureEpoch = _service.LatestCaptureEpoch,
+                ResultStatus = TrackingResultStatus.Success,
             };
             status.HandednessList.Clear();
             status.ScoreList.Clear();

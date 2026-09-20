@@ -1,3 +1,4 @@
+using MediaPipeUnityDots.Runtime.Tracking;
 using System;
 using Unity.Entities;
 
@@ -46,18 +47,33 @@ namespace MediaPipeUnityDots.Runtime.Ecs
             }
         }
 
-        public static void WriteInvalidPolledState(EntityManager entityManager, Entity entity, long timestampUs, long frameCount, long captureId, long captureTimestampUs, long captureEpoch)
+        public static void WriteInvalidPolledState(
+            EntityManager entityManager,
+            Entity entity,
+            long timestampUs,
+            long frameCount,
+            long captureId,
+            long captureTimestampUs,
+            long captureEpoch,
+            TrackingResultStatus resultStatus = TrackingResultStatus.NoDetection)
         {
             var status = CreateEmptyStatus(timestampUs, frameCount);
             status.CaptureId = captureId;
             status.CaptureTimestampUs = captureTimestampUs;
             status.CaptureEpoch = captureEpoch;
+            status.ResultStatus = resultStatus;
             entityManager.SetComponentData(entity, status);
+            entityManager.GetBuffer<PoseLandmarkElement>(entity).Clear();
+            entityManager.GetBuffer<PoseWorldLandmarkElement>(entity).Clear();
         }
 
         public static void WriteResetEmptyState(EntityManager entityManager, Entity entity)
         {
-            entityManager.SetComponentData(entity, CreateEmptyStatus(0L, 0L));
+            var status = CreateEmptyStatus(0L, 0L);
+            status.ResultStatus = TrackingResultStatus.Reset;
+            entityManager.SetComponentData(entity, status);
+            entityManager.GetBuffer<PoseLandmarkElement>(entity).Clear();
+            entityManager.GetBuffer<PoseWorldLandmarkElement>(entity).Clear();
         }
 
         private static PoseTrackingStatus CreateEmptyStatus(long timestampUs, long frameCount)
@@ -69,6 +85,7 @@ namespace MediaPipeUnityDots.Runtime.Ecs
                 LandmarkCount = 0,
                 TimestampUs = timestampUs,
                 FrameCount = frameCount,
+                ResultStatus = TrackingResultStatus.Waiting,
             };
         }
     }

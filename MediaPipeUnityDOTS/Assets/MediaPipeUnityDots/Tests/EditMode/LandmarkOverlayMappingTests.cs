@@ -102,11 +102,8 @@ namespace MediaPipeUnityDots.Tests.EditMode
             var points = new float3[3];
             for (var i = 0; i < 3; i++)
             {
-                var filter = new LandmarkFilterState();
-                LandmarkRender.ResolvePoint(
+                LandmarkRender.ResolveFilteredPoint(
                     0.5f, 0.4f + 0.1f * i, 0.5f - 0.1f * i, 2f, 0.5f, 1,
-                    ref filter, 0,
-                    new float3(1f), new float3(0.01f), 1f, 1000L,
                     0f, 0, in mapping, out points[i]);
             }
 

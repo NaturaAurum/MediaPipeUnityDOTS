@@ -13,15 +13,21 @@ namespace MediaPipeUnityDots.Runtime.Tracking
         public const int LandmarkCapacity = 21;
 
         public readonly Vector3[] Points = new Vector3[MaxHands * LandmarkCapacity];
+        public readonly Vector3[] WorldPoints = new Vector3[MaxHands * LandmarkCapacity];
         public readonly int[] Handedness = new int[MaxHands];
         public readonly float[] Scores = new float[MaxHands];
         public readonly int[] PointCounts = new int[MaxHands];
+        public readonly int[] WorldPointCounts = new int[MaxHands];
 
         public int HandCount;
         public int PointCount;
         public bool IsValid;
+        public TrackingResultStatus ResultStatus;
         public long TimestampUs;
         public long FrameCount;
+        public long CaptureId;
+        public long CaptureTimestampUs;
+        public long CaptureEpoch;
 
         public HandTrackingDto()
         {

@@ -18,6 +18,11 @@ namespace MediaPipeUnityDots.Runtime.Tracking
         private readonly SubmitGate _submitGate = new();
         private readonly TrackerWorker<MpudPoseResult> _worker;
         private bool _disposed;
+        private TrackingResultStatus _latestStatus;
+        private TrackingResultMetadata _latestMetadata;
+        private string _latestError;
+        private long _lastSubmittedTimestampUs;
+        private long _lastResultTimestampUs;
 
         public PoseTrackingService(
             string modelPath,
@@ -47,9 +52,17 @@ namespace MediaPipeUnityDots.Runtime.Tracking
             _worker = new TrackerWorker<MpudPoseResult>(
                 "PoseTracker",
                 new PoseWorkerBody(modelPath, numPoses, minDetectionConfidence, minTrackingConfidence));
+            _latestStatus = TrackingResultStatus.Waiting;
+            _latestMetadata = TrackingResultMetadata.Empty(_latestStatus);
         }
 
         public bool LatestIsValid => _snapshot.IsValid;
+
+        public TrackingResultStatus LatestStatus => _latestStatus;
+
+        public TrackingResultMetadata LatestMetadata => _latestMetadata;
+
+        public string LatestError => _latestError;
 
         public int LatestPoseCount => _snapshot.PoseCount;
 
@@ -63,6 +76,11 @@ namespace MediaPipeUnityDots.Runtime.Tracking
 
         public long LatestCaptureTimestampUs => _snapshot.CaptureTimestampUs;
 
+        public int GetLatestLandmarkCount(int pose)
+        {
+            ThrowIfDisposed();
+            return _snapshot.GetLandmarkCount(pose);
+        }
         public long LatestCaptureEpoch => _snapshot.CaptureEpoch;
 
         /// <summary>
@@ -112,6 +130,7 @@ namespace MediaPipeUnityDots.Runtime.Tracking
 
             _submitGate.CopyInput(pixels, pixelCount);
             var submitTimestampUs = _timestampGenerator.NextTimestampUs();
+            _lastSubmittedTimestampUs = submitTimestampUs;
             var item = new TrackerWorkItem
             {
                 Stamp = stamp,
@@ -133,29 +152,64 @@ namespace MediaPipeUnityDots.Runtime.Tracking
         }
 
         /// <summary>
-        /// 완료된 결과를 한 번만 가져온다. 오류 문자열은 워커에서 복사되어 메인에서 보고한다.
+        /// 완료 슬롯을 한 번만 소비한다. Waiting은 아직 완료가 없음을 뜻한다.
         /// </summary>
-        public bool TryTakeCompleted()
+        public TrackingResultStatus Poll()
         {
-            ThrowIfDisposed();
+            if (_disposed)
+            {
+                return TrackingResultStatus.Disposed;
+            }
 
             if (!_worker.TryTake(out var completion))
             {
-                return false;
+                return TrackingResultStatus.Waiting;
             }
 
             if (!completion.Ok)
             {
-                MpudLog.Error(completion.Error ?? "[MPUD] pose worker failed.");
-                return false;
+                _snapshot.ResetToEmpty();
+                _latestError = completion.Error ?? _worker.FaultError ?? "pose worker failed.";
+                _latestStatus = TrackingResultStatus.Error;
+                _latestMetadata = new TrackingResultMetadata(
+                    _latestStatus, 0, completion.Stamp.CaptureId, completion.Stamp.CaptureTimestampUs,
+                    completion.Stamp.CaptureEpoch, 0, completion.Generation, _lastSubmittedTimestampUs);
+                MpudLog.Error("[MPUD] " + _latestError);
+                return _latestStatus;
             }
 
             var result = completion.Result;
+            if (_lastResultTimestampUs > 0 && result.timestampUs <= _lastResultTimestampUs)
+            {
+                _snapshot.ResetToEmpty();
+                _latestError = null;
+                _latestStatus = TrackingResultStatus.Stale;
+                _latestMetadata = new TrackingResultMetadata(
+                    _latestStatus, result.timestampUs, completion.Stamp.CaptureId,
+                    completion.Stamp.CaptureTimestampUs, completion.Stamp.CaptureEpoch,
+                    0, completion.Generation, _lastSubmittedTimestampUs);
+                return _latestStatus;
+            }
+
+            _lastResultTimestampUs = result.timestampUs;
             _snapshot.UpdateFrom(ref result);
-            _stampMap.TryTake(result.timestampUs, out var stamp);
-            _snapshot.SetCaptureStamp(stamp);
-            return true;
+            if (!_stampMap.TryTake(result.timestampUs, out var resolved))
+            {
+                resolved = completion.Stamp;
+            }
+
+            _snapshot.SetCaptureStamp(resolved);
+            _latestError = null;
+            _latestStatus = _snapshot.IsValid
+                ? TrackingResultStatus.Success
+                : TrackingResultStatus.NoDetection;
+            _latestMetadata = new TrackingResultMetadata(
+                _latestStatus, _snapshot.TimestampUs, _snapshot.CaptureId,
+                _snapshot.CaptureTimestampUs, _snapshot.CaptureEpoch, _snapshot.FrameCount,
+                completion.Generation, result.timestampUs);
+            return _latestStatus;
         }
+
 
         public int CopyLatestPoseLandmarksTo(int pose, MpudNormalizedLandmark[] destination)
         {
@@ -180,6 +234,11 @@ namespace MediaPipeUnityDots.Runtime.Tracking
             _stampMap.Clear();
             _submitGate.Reset();
             _timestampGenerator.ResetForRecreate();
+            _lastSubmittedTimestampUs = 0;
+            _lastResultTimestampUs = 0;
+            _latestError = null;
+            _latestStatus = TrackingResultStatus.Reset;
+            _latestMetadata = TrackingResultMetadata.Empty(_latestStatus, _worker.Generation);
         }
 
         public void Dispose()
@@ -189,8 +248,12 @@ namespace MediaPipeUnityDots.Runtime.Tracking
                 return;
             }
 
+            _snapshot.ResetToEmpty();
             _disposed = true;
             _worker.Dispose();
+            _latestError = null;
+            _latestStatus = TrackingResultStatus.Disposed;
+            _latestMetadata = TrackingResultMetadata.Empty(_latestStatus, _worker.Generation);
             if (_worker.ShutdownError != null)
             {
                 MpudLog.Error($"[MPUD] pose worker shutdown: {_worker.ShutdownError}");

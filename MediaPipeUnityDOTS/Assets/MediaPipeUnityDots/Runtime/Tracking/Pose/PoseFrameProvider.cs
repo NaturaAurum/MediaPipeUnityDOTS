@@ -3,6 +3,7 @@ using System.IO;
 using MediaPipeUnityDots.Runtime.Ecs;
 using MediaPipeUnityDots.Runtime.Interop;
 using MediaPipeUnityDots.Runtime.Tracking;
+using MediaPipeUnityDots.Runtime.Models;
 using Unity.Entities;
 using UnityEngine;
 
@@ -26,6 +27,8 @@ namespace MediaPipeUnityDots.Runtime.Tracking
         private float _minTrackingConfidence = 0.5f;
         [SerializeField]
         private int _logIntervalFrames = 60;
+        [SerializeField]
+        private string _modelPath;
 
         /// <summary>
         /// 추적할 포즈 수. PoseTrackingService와 포인트 스포너가 공유한다.
@@ -74,16 +77,23 @@ namespace MediaPipeUnityDots.Runtime.Tracking
                 return;
             }
 
-            if (_service.TryTakeCompleted())
+            var resultStatus = _service.Poll();
+            if (resultStatus != TrackingResultStatus.Waiting)
             {
-                if (MpudLog.Enabled && _logIntervalFrames > 0 && _submitCount % _logIntervalFrames == 0)
+                if (resultStatus == TrackingResultStatus.Success
+                    || resultStatus == TrackingResultStatus.NoDetection)
                 {
-                    MpudLog.Log(
-                        $"[MPUD] Pose frame #{_service.LatestFrameCount} | Valid={_service.LatestIsValid} | Poses={_service.LatestPoseCount} | Landmarks={_service.LatestLandmarkCount} | ts={_service.LatestTimestampUs}");
+                    if (MpudLog.Enabled && _logIntervalFrames > 0 && _submitCount % _logIntervalFrames == 0)
+                    {
+                        MpudLog.Log(
+                            $"[MPUD] Pose frame #{_service.LatestFrameCount} | Status={resultStatus} | Poses={_service.LatestPoseCount} | Landmarks={_service.LatestLandmarkCount} | ts={_service.LatestTimestampUs}");
+                    }
                 }
 
                 if (TryGetEntityManager(out var entityManager)
-                    && _service.LatestTimestampUs > _lastCopiedTimestamp
+                    && (resultStatus == TrackingResultStatus.Error
+                        || resultStatus == TrackingResultStatus.Stale
+                        || _service.LatestTimestampUs > _lastCopiedTimestamp)
                     && EnsurePoseOwnership(entityManager))
                 {
                     PushLatestSnapshotToEcs(entityManager);
@@ -125,16 +135,13 @@ namespace MediaPipeUnityDots.Runtime.Tracking
                 return;
             }
 
-            var modelPath = Path.Combine(
-                Application.streamingAssetsPath,
-                "MediaPipe",
-                "Models",
-                "pose_landmarker_full.task");
+            var modelPath = string.IsNullOrWhiteSpace(_modelPath)
+                ? ModelPaths.GetPath(TrackingModel.Pose)
+                : _modelPath;
             if (!File.Exists(modelPath))
             {
-                throw new FileNotFoundException("pose_landmarker_full.task was not found.", modelPath);
+                throw new FileNotFoundException("pose model was not found.", modelPath);
             }
-
             _service = new PoseTrackingService(modelPath, NumPoses, _minDetectionConfidence, _minTrackingConfidence);
             _landmarkCopyBuffer = new MpudNormalizedLandmark[LandmarkCapacity];
             _ecsWorld = null;
@@ -175,7 +182,8 @@ namespace MediaPipeUnityDots.Runtime.Tracking
                 _service.LatestFrameCount,
                 _service.LatestCaptureId,
                 _service.LatestCaptureTimestampUs,
-                _service.LatestCaptureEpoch);
+                _service.LatestCaptureEpoch,
+                _service.LatestStatus);
         }
 
         private void WriteValidPolledState(EntityManager entityManager)
@@ -194,6 +202,7 @@ namespace MediaPipeUnityDots.Runtime.Tracking
                     CaptureId = _service.LatestCaptureId,
                     CaptureTimestampUs = _service.LatestCaptureTimestampUs,
                     CaptureEpoch = _service.LatestCaptureEpoch,
+                    ResultStatus = TrackingResultStatus.Success,
                 });
 
             var landmarks = entityManager.GetBuffer<PoseLandmarkElement>(_singletonEntity);

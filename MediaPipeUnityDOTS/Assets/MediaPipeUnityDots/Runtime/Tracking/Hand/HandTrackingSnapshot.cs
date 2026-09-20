@@ -12,7 +12,7 @@ namespace MediaPipeUnityDots.Runtime.Tracking
     {
         public const int MaxHands = MpudHandResult.MaxHands;
 
-        private const int LandmarkCapacity = MpudHandResult.LandmarksPerHand;
+        public const int LandmarkCapacity = MpudHandResult.LandmarksPerHand;
 
         private readonly MpudNormalizedLandmark[] _landmarks;
         private readonly MpudNormalizedLandmark[] _worldLandmarks;
@@ -32,7 +32,21 @@ namespace MediaPipeUnityDots.Runtime.Tracking
 
         public int HandCount { get; private set; }
 
-        public bool IsValid => HandCount > 0;
+        public bool IsValid
+        {
+            get
+            {
+                for (var hand = 0; hand < HandCount; hand++)
+                {
+                    if (_landmarkCounts[hand] > 0)
+                    {
+                        return true;
+                    }
+                }
+
+                return false;
+            }
+        }
 
         public int Handedness => HandCount > 0 ? _handedness[0] : -1;
 
@@ -124,7 +138,8 @@ namespace MediaPipeUnityDots.Runtime.Tracking
         }
 
         /// <summary>
-        /// hand 0의 landmark를 caller-owned destination에 복사한다.
+        /// hand 0의 normalized image landmark를 caller-owned destination에 복사한다.
+        /// z는 MediaPipe normalized image 기준 상대 깊이이며 Unity 월드 좌표가 아니다.
         /// destination은 최소 21 capacity여야 한다.
         /// 반환값은 복사된 landmark 수.
         /// </summary>

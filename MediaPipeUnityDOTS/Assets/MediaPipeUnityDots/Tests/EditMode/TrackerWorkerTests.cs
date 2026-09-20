@@ -356,6 +356,8 @@ namespace MediaPipeUnityDots.Tests.EditMode
                 Assert.IsTrue(WaitFor(() => worker.TryTake(out taken)), "reset failure was not delivered");
                 Assert.IsFalse(taken.Ok);
                 StringAssert.Contains("boom-reset", taken.Error);
+                Assert.IsTrue(worker.IsFaulted);
+                StringAssert.Contains("boom-reset", worker.FaultError);
                 Assert.IsFalse(worker.TryTake(out _), "reset failure is a one-time receipt");
                 Assert.IsFalse(worker.IsAccepting, "reset failure must permanently fault acceptance");
                 Assert.IsFalse(worker.TrySubmit(Item(2L)));
@@ -377,6 +379,8 @@ namespace MediaPipeUnityDots.Tests.EditMode
             Assert.IsTrue(WaitFor(() => worker.TryTake(out taken)), "error completion was not delivered");
             Assert.IsFalse(taken.Ok);
             Assert.AreEqual("native boom", taken.Error);
+            Assert.IsTrue(worker.IsFaulted);
+            Assert.AreEqual("native boom", worker.FaultError);
             Assert.IsFalse(worker.TryTake(out _), "single delivery");
         }
 
