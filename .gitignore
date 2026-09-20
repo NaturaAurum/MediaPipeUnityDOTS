@@ -63,3 +63,4 @@ MediaPipeUnityDOTS/Assets/Samples.meta
 
 # 네이티브 빌드 산출물
 Native/Artifacts/MacosEditor/*.dylib
+Native/Artifacts/MacosEditor/*.build-inputs

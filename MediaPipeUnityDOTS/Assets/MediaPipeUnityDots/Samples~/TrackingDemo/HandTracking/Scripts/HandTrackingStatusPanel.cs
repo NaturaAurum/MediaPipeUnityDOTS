@@ -26,6 +26,7 @@ namespace MediaPipeUnityDots.Sample.HandTracking.Scripts
         private Label _timestampLabel;
         private Label _handednessLabel;
         private Label _confidenceLabel;
+        private Button _resetButton;
 
         private void OnEnable()
         {
@@ -41,6 +42,7 @@ namespace MediaPipeUnityDots.Sample.HandTracking.Scripts
 
         private void OnDisable()
         {
+            UnbindResetButton();
             if (_panelRenderer != null)
             {
                 _panelRenderer.UnregisterUIReloadCallback(OnUIReload);
@@ -62,14 +64,15 @@ namespace MediaPipeUnityDots.Sample.HandTracking.Scripts
             _handednessLabel = root.Q<Label>("hand-label");
             _confidenceLabel = root.Q<Label>("confidence-label");
 
-            var resetButton = root.Q<Button>("reset-button");
-            if (resetButton != null)
+            UnbindResetButton();
+            _resetButton = root.Q<Button>("reset-button");
+            if (_resetButton != null)
             {
-                resetButton.clicked += OnResetClicked;
+                _resetButton.clicked += OnResetClicked;
             }
 
             if (_stateLabel == null || _frameLabel == null || _timestampLabel == null
-                || _handednessLabel == null || _confidenceLabel == null || resetButton == null)
+                || _handednessLabel == null || _confidenceLabel == null || _resetButton == null)
             {
                 MpudLog.Error("[MPUD] StatusPanel.uxml is missing expected elements.");
             }
@@ -94,6 +97,15 @@ namespace MediaPipeUnityDots.Sample.HandTracking.Scripts
             if (_provider != null)
             {
                 _provider.ResetTracker();
+            }
+        }
+
+        private void UnbindResetButton()
+        {
+            if (_resetButton != null)
+            {
+                _resetButton.clicked -= OnResetClicked;
+                _resetButton = null;
             }
         }
 

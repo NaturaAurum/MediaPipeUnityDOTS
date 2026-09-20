@@ -47,6 +47,13 @@
     margin-bottom: 4px;
 }
 
+.filter-status {
+    color: rgb(255, 190, 110);
+    font-size: 11px;
+    white-space: normal;
+    margin-bottom: 4px;
+}
+
 .setting-slider {
     color: rgb(220, 220, 220);
     font-size: 11px;

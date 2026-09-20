@@ -321,9 +321,15 @@ namespace MediaPipeUnityDots.EditorTool
             }
         }
 
-        private static void EnsureImportedMetadata(TrackingModel model, string targetPath)
+        internal static void EnsureImportedMetadata(TrackingModel model, string targetPath)
         {
             if (model != TrackingModel.Depth)
+            {
+                return;
+            }
+
+            var targetMetadata = targetPath + ".meta";
+            if (File.Exists(targetMetadata))
             {
                 return;
             }
@@ -345,7 +351,6 @@ namespace MediaPipeUnityDots.EditorTool
                 throw new InvalidDataException($"Depth metadata에 32자리 GUID가 없습니다: {metadataSource}");
             }
 
-            var targetMetadata = targetPath + ".meta";
             var tempMetadata = targetMetadata + "." + Guid.NewGuid().ToString("N") + ".download";
             File.Copy(metadataSource, tempMetadata, true);
             ReplaceAtomically(tempMetadata, targetMetadata);

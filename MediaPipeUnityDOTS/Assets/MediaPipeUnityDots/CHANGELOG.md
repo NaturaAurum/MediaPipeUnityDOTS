@@ -13,7 +13,7 @@
 - Hand/Face/Pose/Holistic의 caller-owned raw/world 복사, 상태 및 캡처 메타데이터.
 - Hand/Pose landmark 이름·기본 연결선, Face blendshape 이름 조회.
 - 렌더 독립 기본 One Euro/ECS 필터 버퍼, `ILandmarkFilter`와 명시적 소유권을 가진 managed coordinator.
-- 빈 Git 소비자의 실제 4종 검출 및 격리된 macOS Mono Player 검증 도구.
+- 빈 Git 소비자의 두 선택 샘플 컴파일, 실제 4종 검출 및 격리된 macOS Mono Player 검증 도구.
 
 ### 변경
 
@@ -28,11 +28,15 @@
 - 결과 대기와 새 미검출을 구분하고 오류·stale·reset·dispose 후 이전 데이터를 새 결과로 발행하지 않도록 정리.
 - 사용자 필터 reset 예외 및 교체 실패 후 이전 캐시가 정상 출력으로 재사용되던 경우를 차단.
 - 큰 interop 구조체를 값으로 왕복하던 회귀 검증의 Mono 크래시 경로를 ref 기반으로 변경.
+- Depth 모델 재준비 시 기존 소비자 `.meta`와 importer 설정을 보존.
+- 제출 스탬프 보관 구조의 장시간 누적과 사용자 필터 해제 실패 후 캐시 재노출을 차단.
+- 네이티브 산출물에 빌드 입력·upstream 커밋·바이너리 해시를 결합하고 오래된 산출물 패키징을 거부.
+- 샘플 fixture 반복 복사, UI 재바인딩 구독, Pose/Holistic Provider reset 표면과 Holistic 미제공 score를 정리.
 
 ### 배포 조건
 
 - 자체 코드 MIT. 전체 native 번들·Unity 의존성·모델·사진은 별도 조건 적용.
-- 현재 native 최소 OS는 동봉 의존성 기준 **macOS 26.0**, CPU/arm64. Unity 6000.6.0f1, macOS 26.5.1/M4 Pro의 Editor 및 Mono Player 실행을 검증했습니다.
+- 현재 native 최소 OS는 동봉 의존성 기준 **macOS 26.0**, CPU/arm64. macOS 26.5.1/M4 Pro에서 Unity 6000.6.2f1 Editor와 Unity 6000.6.0f1 Mono Player 실행을 각각 검증했습니다.
 - 모델과 검증 사진은 Git에 동봉하지 않습니다.
 - 별도 Mac의 Homebrew/Bazel 미설치 검증 및 릴리스 승인 전에는 정식 태그를 생성하지 않습니다. 같은 호스트의 sandbox 실행과 별도 기기 검증을 구분합니다.
 

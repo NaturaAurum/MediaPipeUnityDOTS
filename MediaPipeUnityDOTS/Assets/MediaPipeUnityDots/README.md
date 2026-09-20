@@ -1,6 +1,6 @@
 # MediaPipe Unity DOTS
 
-UPM 패키지 `com.natura-aurum.mediapipe-unity-dots`, 버전 `0.1.0`. Unity `6000.6.0f1`에서 검증했습니다. 현재 네이티브 번들은 macOS **26.0 이상 / Apple Silicon arm64 / CPU 추론**용입니다. Windows·모바일·WebGL·Intel Mac·IL2CPP 지원을 표방하지 않습니다.
+UPM 패키지 `com.natura-aurum.mediapipe-unity-dots`, 버전 `0.1.0`. Unity `6000.6.2f1` Editor에서 검증했습니다. 현재 네이티브 번들은 macOS **26.0 이상 / Apple Silicon arm64 / CPU 추론**용입니다. Windows·모바일·WebGL·Intel Mac·IL2CPP 지원을 표방하지 않습니다.
 
 소비자는 네이티브 빌드 없이 설치합니다. Git URL의 `?path=/MediaPipeUnityDOTS/Assets/MediaPipeUnityDots`와 검증된 `#리비전`을 함께 지정하세요. Git LFS는 사용하지 않습니다. 패키지 의존성은 자동 설치되며 Samples는 선택 사항입니다. 공개 릴리스 태그는 아직 발행하지 않았습니다.
 
@@ -18,7 +18,7 @@ UPM 패키지 `com.natura-aurum.mediapipe-unity-dots`, 버전 `0.1.0`. Unity `60
 - 임시 다운로드의 해시를 확인한 뒤 교체합니다. 실패하면 기존 정상 파일을 보존하고 오류를 보고합니다. 준비된 모델을 사용하는 추론은 네트워크가 필요 없습니다.
 - Task 모델은 StreamingAssets에 들어가므로 macOS Player에서도 `ModelPaths.GetPath(TrackingModel.Hand)` 등으로 접근합니다.
 - 서비스 생성자의 `modelPath` 또는 Provider의 Inspector `Model Path`로 별도 모델을 지정할 수 있습니다. 사용자 모델의 호환성·라이선스·배포와 Player에서 유효한 경로는 소비자가 책임집니다. 외부 절대 경로의 파일을 자동으로 Player에 복사하지 않습니다.
-- Depth는 `.onnx`를 Inference Engine의 `ModelAsset`으로 Import합니다. Provider를 선택하고 **MediaPipe → Models → Assign Depth Model To Selected Providers**로 연결합니다. Player에는 직렬화된 `ModelAsset` 참조로 포함하며 ONNX 파일 경로로 로드하지 않습니다.
+- Depth는 `.onnx`를 Inference Engine의 `ModelAsset`으로 Import합니다. 기존 `.meta`와 소비자 importer 설정은 덮어쓰지 않으며, 처음 설치할 때만 패키지의 GUID 템플릿을 만듭니다. Provider를 선택하고 **MediaPipe → Models → Assign Depth Model To Selected Providers**로 연결합니다. Player에는 직렬화된 `ModelAsset` 참조로 포함하며 ONNX 파일 경로로 로드하지 않습니다.
 - 씬 빌드 검사는 활성 Provider가 사용하는 모델을 검사합니다. 기본 Task 모델의 손상·누락, Depth의 미연결 상태는 빌드 오류입니다. 직접 서비스만 사용하는 코드의 모델 준비는 소비자 검증으로 확인해야 합니다.
 
 배치 준비 진입점은 `MediaPipeUnityDots.EditorTool.DownloadDepthModel.PrepareBatch`이며 `-mpudModels Hand,Face,Pose,Holistic`처럼 선택합니다. 모델 조건은 [Third Party Notices](Third%20Party%20Notices.md)를 확인하세요.
@@ -78,6 +78,8 @@ public sealed class HandTipReader : IDisposable
 
 서비스 내부 배열이나 네이티브 포인터를 외부에 넘기지 않습니다. 복사한 배열의 소유권과 수명은 호출자에게 있으며 다음 추론 이후에도 보존됩니다. 충분한 용량의 배열을 재사용하고 유효 prefix `[0, count)`만 읽으세요. 서비스 생성·제출·폴링·복사·reset·dispose는 하나의 Unity 메인 스레드에서 순서대로 호출합니다. 네이티브 추론만 내부 워커에서 실행합니다.
 
+`HandFrameProvider`, `FaceFrameProvider`, `PoseFrameProvider`, `HolisticFrameProvider`는 모두 `ResetTracker()`를 제공하며 캡처 epoch와 ECS 공개 상태를 함께 초기화합니다.
+
 ### 상태와 시간
 
 | `Poll()` 결과 | 의미와 소비 방법 |
@@ -96,7 +98,7 @@ public sealed class HandTipReader : IDisposable
 
 - **Normalized image**: 제출 이미지 기준 x는 오른쪽, y는 아래쪽입니다. x/y는 보통 0–1이지만 모델 출력을 clamp하지 않습니다. z는 모델 상대 깊이이며 일반적으로 작은 값이 카메라에 가깝습니다. x/y/z를 곧바로 Unity world 미터로 사용하지 마세요.
 - **Model world**: Hand/Pose에서 제공하는 모델의 미터 단위 3D 좌표입니다. Hand의 손 중심, Pose의 양쪽 엉덩이 중심 등 부위별 원점을 사용합니다. 카메라 외부 파라미터나 Unity transform이 적용된 좌표가 아닙니다. Face에는 이 API의 world 결과가 없습니다.
-- `MpudNormalizedLandmark`는 복사 API의 공통 float 전달 구조체입니다. 이름과 무관하게 `*World*` 메서드의 값은 model-world입니다. `visibility`·`presence`는 모델이 제공한 값만 의미가 있으며 미제공 값을 신뢰도 1로 보완하지 않습니다. Hand 대상별 score/handedness는 별도 접근자로 읽습니다.
+- `MpudNormalizedLandmark`는 복사 API의 공통 float 전달 구조체입니다. 이름과 무관하게 `*World*` 메서드의 값은 model-world입니다. `visibility`·`presence`는 모델이 제공한 값만 의미가 있으며 미제공 값을 신뢰도 1로 보완하지 않습니다. Hand 대상별 score/handedness는 별도 접근자로 읽습니다. Holistic 결과에는 손 score가 없으므로 `HolisticFrameProvider`가 발행하는 Hand score는 0입니다.
 - **Unity 표시 좌표**: `OverlayMapping` 등 표시 계층에서 생성합니다. y 반전, cover-crop, 화면 비율, 미러링, 깊이 배율을 원시 결과와 혼동하지 마세요. `TrySubmit`의 `flipVertically`는 입력 행 순서 변환이지 좌우 미러링이 아닙니다.
 
 ### 이름으로 접근
@@ -146,7 +148,7 @@ if (!filter.TryProcess(raw.AsSpan(0, count), filtered, in context, out var writt
 - 시간 역행, epoch·스트림·대상·좌표 변경, 토큰 변경, `Reset()` 및 `ReplaceFilter()`는 상태를 초기화합니다.
 - 토큰 0은 매 새 프레임 reset합니다. 따라서 **연속성 미증명 상태의 기본 One Euro 출력은 raw와 같습니다.** 임의의 고정 토큰이나 프레임 ordinal로 사람 ID를 만들어 이 보호를 우회하지 마세요.
 - 추적 손실·오류·stale·서비스 reset을 받으면 관리 계층에서도 `filter.Reset()`을 호출합니다. 빈 입력은 이력을 지우고 `NoData`, count 0을 반환합니다.
-- 입력/출력 overlap, 부족한 용량, 잘못된 count, NaN/Infinity, 사용자 필터 예외는 정상 출력으로 발행하지 않습니다. `TryProcess`의 `false`와 `LastResult`/`LastError`를 확인하세요. 명시적 `Reset`/`ReplaceFilter`는 사용자 `Reset` 예외를 호출자에게 전달하지만 이전 캐시를 정상 결과로 재사용하지 않습니다.
+- 입력/출력 overlap, 부족한 용량, 잘못된 count, NaN/Infinity, 사용자 필터 예외는 정상 출력으로 발행하지 않습니다. `TryProcess`의 `false`와 `LastResult`/`LastError`를 확인하세요. 명시적 `Reset`/`ReplaceFilter`는 사용자 `Reset` 예외를 호출자에게 전달하지만 이전 캐시를 정상 결과로 재사용하지 않습니다. 소유한 사용자 필터의 `Dispose`가 실패해도 coordinator는 즉시 종료 상태가 되며 캐시를 다시 노출하지 않습니다.
 - 기본 One Euro는 기존 `LandmarkFilterState` 계산 코어를 사용합니다. 일정한 입력 용량으로 워밍업한 뒤 **필터 자체**의 프레임별 managed 할당이 없음을 회귀 검사합니다. 입력 캡처·호출자 배열 생성·사용자 구현의 비용까지 0이라고 보장하지 않습니다.
 
 ### 소비자 구현 연결

@@ -17,6 +17,7 @@ namespace MediaPipeUnityDots.Runtime.Tracking
     /// </summary>
     public sealed class HolisticFrameProvider : MonoBehaviour
     {
+        private const float MissingHandScore = 0f;
         [SerializeField]
         private WebcamFrameProvider _webcamSource;
         [SerializeField]
@@ -181,6 +182,22 @@ namespace MediaPipeUnityDots.Runtime.Tracking
             _faceSingleton = Entity.Null;
             _poseSingleton = Entity.Null;
             _handSingleton = Entity.Null;
+        }
+
+        public void ResetTracker()
+        {
+            if (_service == null)
+            {
+                return;
+            }
+
+            _service.ResetTracker();
+            _webcamSource.BumpCaptureEpoch();
+            _lastCopiedTimestamp = 0;
+            if (TryGetEntityManager(out var entityManager))
+            {
+                PushAllToEcs(entityManager);
+            }
         }
 
         private void PushAllToEcs(EntityManager entityManager)
@@ -358,7 +375,7 @@ namespace MediaPipeUnityDots.Runtime.Tracking
                 IsValid = true,
                 HandCount = handCount,
                 Handedness = 0,
-                Score = 1f,
+                Score = MissingHandScore,
                 LandmarkCount = leftCount > 0 ? leftCount : rightCount,
                 TimestampUs = _service.LatestTimestampUs,
                 FrameCount = _service.LatestFrameCount,
@@ -381,7 +398,7 @@ namespace MediaPipeUnityDots.Runtime.Tracking
             {
                 WriteHandSlot(landmarks, slot, 0, _leftHandCopy, leftCount);
                 status.HandednessList.Add(0);
-                status.ScoreList.Add(1f);
+                status.ScoreList.Add(MissingHandScore);
                 slot++;
             }
 
@@ -389,7 +406,7 @@ namespace MediaPipeUnityDots.Runtime.Tracking
             {
                 WriteHandSlot(landmarks, slot, slot, _handCopyBuffer, rightCount);
                 status.HandednessList.Add(1);
-                status.ScoreList.Add(1f);
+                status.ScoreList.Add(MissingHandScore);
                 slot++;
             }
 

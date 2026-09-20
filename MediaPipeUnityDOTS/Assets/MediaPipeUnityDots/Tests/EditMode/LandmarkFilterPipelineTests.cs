@@ -195,6 +195,35 @@ namespace MediaPipeUnityDots.Tests.EditMode
         }
 
         [Test]
+        public void DisposeFailureStillMakesCoordinatorTerminal()
+        {
+            var filter = new TrackingFilter(throwOnDispose: true);
+            var coordinator = new LandmarkFilterCoordinator(filter, true);
+            var input = new[] { Landmark(1f) };
+            var output = new MpudNormalizedLandmark[1];
+            var context = Context(0, 10, 7, 11);
+            Assert.IsTrue(coordinator.TryProcess(input, output, in context, out _));
+
+            Assert.Throws<InvalidOperationException>(() => coordinator.Dispose());
+
+            Assert.IsFalse(coordinator.TryProcess(input, output, in context, out var count));
+            Assert.AreEqual(0, count);
+            Assert.AreEqual(LandmarkFilterResult.Disposed, coordinator.LastResult);
+            Assert.IsFalse(coordinator.HasValidOutput);
+        }
+
+        [Test]
+        public void OwnedFilterDisposeFailureMakesReplacementTerminal()
+        {
+            var coordinator = new LandmarkFilterCoordinator(new TrackingFilter(throwOnDispose: true), true);
+
+            Assert.Throws<InvalidOperationException>(() => coordinator.ReplaceFilter(new TrackingFilter()));
+
+            Assert.Throws<ObjectDisposedException>(() => coordinator.Reset());
+            Assert.AreEqual(LandmarkFilterResult.Disposed, coordinator.LastResult);
+        }
+
+        [Test]
         public void WarmedOneEuroFilter_HasNoSteadyStateManagedAllocation()
         {
             using var filter = new OneEuroLandmarkFilter();
@@ -422,6 +451,13 @@ namespace MediaPipeUnityDots.Tests.EditMode
 
         private sealed class TrackingFilter : ILandmarkFilter
         {
+            private readonly bool _throwOnDispose;
+
+            public TrackingFilter(bool throwOnDispose = false)
+            {
+                _throwOnDispose = throwOnDispose;
+            }
+
             public bool Disposed { get; private set; }
 
             public int Filter(
@@ -440,6 +476,10 @@ namespace MediaPipeUnityDots.Tests.EditMode
             public void Dispose()
             {
                 Disposed = true;
+                if (_throwOnDispose)
+                {
+                    throw new InvalidOperationException("custom dispose failed");
+                }
             }
         }
     }

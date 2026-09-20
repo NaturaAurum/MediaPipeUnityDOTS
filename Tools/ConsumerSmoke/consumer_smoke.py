@@ -26,7 +26,7 @@ using UnityEditor;
 using UnityEditor.PackageManager;
 using UnityEngine;
 
-public static class ImportLandmarkApi
+public static class ImportSamples
 {
     public static void Run()
     {
@@ -35,15 +35,22 @@ public static class ImportLandmarkApi
             foreach (var package in UnityEditor.PackageManager.PackageInfo.GetAllRegisteredPackages())
             {
                 if (package.name != "com.natura-aurum.mediapipe-unity-dots") continue;
-                var source = Path.Combine(package.resolvedPath, "Samples~/LandmarkApi");
-                var target = Path.Combine(Application.dataPath, "Samples", package.displayName, package.version, "Landmark API");
-                foreach (var file in Directory.GetFiles(source, "*", SearchOption.AllDirectories))
+                foreach (var sample in new[]
                 {
-                    var destination = Path.Combine(target, file.Substring(source.Length + 1));
-                    Directory.CreateDirectory(Path.GetDirectoryName(destination));
-                    File.Copy(file, destination, false);
+                    new[] { "LandmarkApi", "Landmark API" },
+                    new[] { "TrackingDemo", "Tracking Demo" },
+                })
+                {
+                    var source = Path.Combine(package.resolvedPath, "Samples~", sample[0]);
+                    var target = Path.Combine(Application.dataPath, "Samples", package.displayName, package.version, sample[1]);
+                    foreach (var file in Directory.GetFiles(source, "*", SearchOption.AllDirectories))
+                    {
+                        var destination = Path.Combine(target, file.Substring(source.Length + 1));
+                        Directory.CreateDirectory(Path.GetDirectoryName(destination));
+                        File.Copy(file, destination, false);
+                    }
                 }
-                Debug.Log("[MPUD CONSUMER SMOKE] GIT_SAMPLE_IMPORTED " + package.resolvedPath);
+                Debug.Log("[MPUD CONSUMER SMOKE] GIT_SAMPLES_IMPORTED " + package.resolvedPath);
                 EditorApplication.Exit(0);
                 return;
             }
@@ -108,7 +115,7 @@ def main():
         run(name, [str(args.unity.resolve()), "-batchmode", "-nographics",
                    "-projectPath", str(project), "-executeMethod", method, *extra], marker)
 
-    unity("import", "ImportLandmarkApi.Run", "GIT_SAMPLE_IMPORTED")
+    unity("import", "ImportSamples.Run", "GIT_SAMPLES_IMPORTED")
     bootstrap.unlink()
     bootstrap.with_suffix(".cs.meta").unlink(missing_ok=True)
     lock = json.loads((project / "Packages/packages-lock.json").read_text())
@@ -116,7 +123,7 @@ def main():
     if resolution.get("source") != "git":
         raise RuntimeError(f"Git 설치가 아닙니다: {resolution}")
     (work / "git-resolution.json").write_text(json.dumps(resolution, indent=2) + "\n")
-    # 코어만 설치한 첫 컴파일 이후, 선택한 이미지 스모크 샘플의 모듈을 추가한다.
+    # 코어와 두 선택 샘플을 가져온 첫 컴파일 이후, 이미지 스모크에 필요한 모듈을 추가한다.
     manifest_path = project / "Packages/manifest.json"
     manifest = json.loads(manifest_path.read_text())
     manifest["dependencies"]["com.unity.modules.imageconversion"] = "1.0.0"

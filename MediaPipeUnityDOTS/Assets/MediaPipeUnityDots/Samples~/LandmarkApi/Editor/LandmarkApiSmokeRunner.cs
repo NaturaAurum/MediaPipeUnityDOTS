@@ -148,7 +148,7 @@ namespace MediaPipeUnityDots.Sample.LandmarkApi.Editor
                 var destination = Path.Combine(Application.streamingAssetsPath, "MediaPipe", "Fixtures", filename);
                 Directory.CreateDirectory(Path.GetDirectoryName(destination));
                 if (Path.GetFullPath(source) != Path.GetFullPath(destination))
-                    File.Copy(source, destination, false);
+                    File.Copy(source, destination, true);
             }
         }
 

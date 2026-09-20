@@ -4,7 +4,7 @@
 
 ## 빌드 기준
 
-- MediaPipe submodule: `v1.0.0`, `6d31f1ebc3284db74d211d62bdc4f0a0c29ea120`.
+- MediaPipe submodule: `v1.0.0`, `6d31f1ebc3284db74d211d62bdc4f0a0c29ea120`. `BuildMacosEditor.sh`가 다른 HEAD를 거부합니다.
 - Bazel: upstream `.bazelversion`의 `7.4.1`. `BuildMacosEditor.sh`가 다른 버전을 거부합니다.
 - 빌드 호스트: macOS Apple Silicon, Xcode/Command Line Tools, `python3`, `bazelisk`, Homebrew `opencv@4`.
 - MediaPipe의 hermetic Python은 `3.11`로 고정합니다. 로컬 기본 Python 버전과 구분합니다.
@@ -39,7 +39,7 @@ MediaPipeUnityDOTS/Assets/MediaPipeUnityDots/Runtime/Plugins/macOS/
 2. 실제 symlink 대상을 복사하고 arm64 슬라이스, install name, 전이 의존 경로를 정리합니다.
 3. 비시스템 로드 경로를 `@loader_path/<동봉 파일>`로 바꾸고 절대/Homebrew 경로나 누락 의존성을 거부합니다.
 4. 모든 dylib를 ad-hoc 서명하고 서명·의존성·플랫폼을 검사합니다.
-5. 명시적 macOS/ARM64 Unity PluginImporter를 만들고, 바이너리 해시·크기·최소 OS·빌드 입력 해시를 기록합니다.
+5. 명시적 macOS/ARM64 Unity PluginImporter를 만들고, 바이너리 해시·크기·최소 OS·빌드 입력 해시를 기록합니다. 빌드 시 저장한 입력 집합 해시와 현재 입력이 다르면 오래된 산출물의 패키징을 거부합니다.
 6. Homebrew 라이브러리의 라이선스와 실제 설치 소스 레시피, Bazel C/C++ 의존 그래프의 정적 라이브러리 고지를 수집합니다.
 
 브리지 자체는 macOS 11로 컴파일되지만 현재 OpenCV 등 의존성은 26.0을 요구합니다. **완성 번들의 실제 최소 OS는 macOS 26.0**입니다. 브리지 플래그 하나만 보고 지원 하한을 낮추지 마세요. 사용자가 배포하는 앱의 최종 서명·공증은 앱 배포자의 작업입니다.

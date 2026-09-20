@@ -167,6 +167,22 @@ namespace MediaPipeUnityDots.Runtime.Tracking
             _singletonEntity = Entity.Null;
         }
 
+        public void ResetTracker()
+        {
+            if (_service == null)
+            {
+                return;
+            }
+
+            _service.ResetTracker();
+            _webcamSource.BumpCaptureEpoch();
+            _lastCopiedTimestamp = 0;
+            if (TryGetEntityManager(out var entityManager) && EnsurePoseOwnership(entityManager))
+            {
+                PushLatestSnapshotToEcs(entityManager);
+            }
+        }
+
         private void PushLatestSnapshotToEcs(EntityManager entityManager)
         {
             if (_service.LatestIsValid)
