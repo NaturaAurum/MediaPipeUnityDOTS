@@ -1,0 +1,12 @@
+{
+    "name": "MediaPipeUnityDots.Sample.Tests.Editor",
+    "references": [
+        "MediaPipeUnityDots.Runtime",
+        "MediaPipeUnityDots.Sample",
+        "Unity.Collections",
+        "Unity.Entities"
+    ],
+    "includePlatforms": ["Editor"],
+    "autoReferenced": false,
+    "optionalUnityReferences": ["TestAssemblies"]
+}

@@ -30,8 +30,6 @@ namespace MediaPipeUnityDots.Sample.HandTracking.Scripts
         private Button _resetButton;
         private Label _statusLabel;
 
-        public int PushCount { get; private set; }
-
         private void OnEnable()
         {
             if (_panelRenderer == null)
@@ -262,7 +260,6 @@ namespace MediaPipeUnityDots.Sample.HandTracking.Scripts
 
         private void PushSettingsToEcs()
         {
-            PushCount++;
             RefreshStatusLabel();
             if (TryGetSettingsEntity(out var entityManager, out var entity))
             {

@@ -34,8 +34,6 @@ namespace MediaPipeUnityDots.Sample.HandTracking.Scripts
         private Slider _poseBeta;
         private Button _resetButton;
 
-        public int PushCount { get; private set; }
-
         private void OnEnable()
         {
             if (_panelRenderer == null)
@@ -299,7 +297,6 @@ namespace MediaPipeUnityDots.Sample.HandTracking.Scripts
 
         private void PushSettingsToEcs()
         {
-            PushCount++;
             if (TryGetSettingsEntity(out var entityManager, out var entity))
             {
                 entityManager.SetComponentData(entity, _settings);

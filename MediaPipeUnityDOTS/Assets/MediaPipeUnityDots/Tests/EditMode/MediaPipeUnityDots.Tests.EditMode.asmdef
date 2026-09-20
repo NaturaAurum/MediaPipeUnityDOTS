@@ -3,7 +3,7 @@
   "rootNamespace": "MediaPipeUnityDots.Tests.EditMode",
   "references": [
     "MediaPipeUnityDots.Runtime",
-    "MediaPipeUnityDots.Sample",
+    "MediaPipeUnityDots.EditorTool",
     "Unity.Collections",
     "Unity.Entities",
     "Unity.InferenceEngine",
@@ -13,7 +13,7 @@
     "Editor"
   ],
   "excludePlatforms": [],
-  "allowUnsafeCode": false,
+  "allowUnsafeCode": true,
   "overrideReferences": false,
   "precompiledReferences": [],
   "autoReferenced": false,
