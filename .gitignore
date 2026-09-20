@@ -54,9 +54,12 @@ Native/Upstream/mediapipe/bazel-*
 
 # MediaPipe 모델 바이너리 (용량이 크므로 git에서 제외)
 MediaPipeUnityDOTS/Assets/StreamingAssets/MediaPipe/Models/*.task
-# Depth ONNX (.onnx.meta GUID는 커밋해 씬 참조 유지)
-MediaPipeUnityDOTS/Assets/MediaPipeUnityDots/Models/*.onnx
+# 소비자 모델은 명시적인 설치 단계에서 생성한다. GUID 템플릿은 EditorTool에 보관한다.
+MediaPipeUnityDOTS/Assets/MediaPipeUnityDots/Models/
+MediaPipeUnityDOTS/Assets/MediaPipeUnityDots/Models.meta
+# 개발 프로젝트에는 UPM 샘플 사본을 임포트한다. 원본은 Samples~만 추적한다.
+MediaPipeUnityDOTS/Assets/Samples/
+MediaPipeUnityDOTS/Assets/Samples.meta
 
 # 네이티브 빌드 산출물
 Native/Artifacts/MacosEditor/*.dylib
-MediaPipeUnityDOTS/Assets/MediaPipeUnityDots/Runtime/Plugins/macOS/*.dylib

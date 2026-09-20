@@ -1,0 +1,6 @@
+# model_id	kind	file_name	revision	url	sha256
+Hand	task	hand_landmarker.task	1	https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task	fbc2a30080c3c557093b5ddfc334698132eb341044ccee322ccf8bcf3607cde1
+Face	task	face_landmarker.task	1	https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task	64184e229b263107bc2b804c6625db1341ff2bb731874b0bcc2fe6544e0bc9ff
+Pose	task	pose_landmarker_full.task	1	https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_full/float16/1/pose_landmarker_full.task	5134a3aad27a58b93da0088d431f366da362b44e3ccfbe3462b3827a839011b1
+Holistic	task	holistic_landmarker.task	1	https://storage.googleapis.com/mediapipe-models/holistic_landmarker/holistic_landmarker/float16/1/holistic_landmarker.task	e2dab61191e2dcd0a15f943d8e3ed1dce13c82dfa597b9dd39f562975a50c3f8
+Depth	onnx	depth_anything_v2_small.onnx	4472b7362082ad9968fee890ca0f1e5aca36b93d	https://huggingface.co/onnx-community/depth-anything-v2-small/resolve/4472b7362082ad9968fee890ca0f1e5aca36b93d/onnx/model.onnx	afb6a5c28f3b6bf1618c6e43f02073ef9dfdc70e937502d51603e57b0a1df10c

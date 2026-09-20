@@ -1,27 +1,64 @@
-#!/bin/bash
+#!/usr/bin/env bash
 set -euo pipefail
+
 REPO_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
-DEST_DIR="$REPO_ROOT/MediaPipeUnityDOTS/Assets/StreamingAssets/MediaPipe/Models"
+MANIFEST="$REPO_ROOT/MediaPipeUnityDOTS/Assets/MediaPipeUnityDots/EditorTool/ModelManifest.txt"
+DEFAULT_DEST_DIR="$REPO_ROOT/MediaPipeUnityDOTS/Assets/StreamingAssets/MediaPipe/Models"
+DEST_DIR="${MPUD_MODEL_DEST:-${1:-$DEFAULT_DEST_DIR}}"
+
+if [[ ! -f "$MANIFEST" ]]; then
+    echo "[MPUD] 모델 manifest를 찾지 못했습니다: $MANIFEST" >&2
+    exit 1
+fi
+
 download_model() {
     local name="$1"
     local url="$2"
+    local expected_sha256="$3"
+    local target="$DEST_DIR/$name"
+    local temp
+    local actual_sha256
 
-    if [ ! -f "$DEST_DIR/$name" ]; then
-        echo "[Download] $name"
-        curl -fL -o "$DEST_DIR/$name" "$url"
+    if [[ -f "$target" ]]; then
+        actual_sha256="$(shasum -a 256 "$target" | cut -d ' ' -f 1)"
+        if [[ "$actual_sha256" == "$expected_sha256" ]]; then
+            echo "[Skip] $name (SHA-256 일치)"
+            return
+        fi
+        echo "[Refresh] $name (SHA-256 불일치: expected=$expected_sha256 actual=$actual_sha256)"
     else
-        echo "[Skip] $name already exists"
+        echo "[Download] $name"
     fi
+
+    mkdir -p "$DEST_DIR"
+    temp="$(mktemp "$target.XXXXXX")"
+    if ! curl --fail --location --show-error --retry 2 --output "$temp" "$url"; then
+        rm -f "$temp"
+        echo "[MPUD] 다운로드 실패: $name ($url)" >&2
+        return 1
+    fi
+
+    actual_sha256="$(shasum -a 256 "$temp" | cut -d ' ' -f 1)"
+    if [[ "$actual_sha256" != "$expected_sha256" ]]; then
+        rm -f "$temp"
+        echo "[MPUD] SHA-256 검증 실패: $name (expected=$expected_sha256 actual=$actual_sha256)" >&2
+        return 1
+    fi
+
+    mv -f "$temp" "$target"
+    echo "[Ready] $target"
 }
 
-mkdir -p "$DEST_DIR"
-download_model hand_landmarker.task \
-    https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/latest/hand_landmarker.task
-download_model face_landmarker.task \
-    https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/latest/face_landmarker.task
-download_model pose_landmarker_full.task \
-    https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_full/float16/latest/pose_landmarker_full.task
-download_model holistic_landmarker.task \
-    https://storage.googleapis.com/mediapipe-models/holistic_landmarker/holistic_landmarker/float16/latest/holistic_landmarker.task
+while IFS=$'\t' read -r model kind file_name revision url sha256; do
+    case "$model" in
+        ""|\#*) continue ;;
+    esac
 
-echo "[Done] Models at: $DEST_DIR"
+    if [[ "$kind" != "task" ]]; then
+        continue
+    fi
+
+    download_model "$file_name" "$url" "$sha256"
+done < "$MANIFEST"
+
+echo "[Done] Task 모델 위치: $DEST_DIR"
