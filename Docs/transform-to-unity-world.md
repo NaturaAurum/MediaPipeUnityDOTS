@@ -66,9 +66,9 @@ relativeZ = worldZ - 대상의 최대 worldZ
 
 ## 3. 필터와 시간
 
-필터 입력은 `(정규화 X, 정규화 Y, 상대 월드 Z)`이다. 필터링한 월드 좌표에서 원시 손목을 빼던 혼합 경로는 제거했다.
-입력 `TimestampUs`가 바뀔 때만 필터를 전진시키며, 2D/3D 전환 및 월드 데이터 유실·복귀 시 상태를 리셋한다.
-필터를 켜면 XY는 평활화된 영상 좌표에 정합되므로 움직이는 원본 영상에 대한 필터 지연은 남는다.
+`LandmarkFilterSystem`은 정규화 이미지 XYZ와 모델 world XYZ를 별도 상태로 필터링한다. 렌더러는 그 결과에서 영상 XY와 상대 world Z를 선택해 표시하며 필터를 다시 적용하지 않는다.
+같은 결과 타임스탬프는 상태를 재전진시키지 않는다. epoch 변경·시간 역행·손실·재검출·대상 변경은 필터 계약에 따라 초기화한다. 2D/3D 표시 전환으로 서로 다른 좌표 공간의 상태를 섞지 않는다.
+대상 연속성 토큰이 없으면 매 새 프레임 이력을 초기화한다. 연속성을 증명해 평활화하는 경우에도 움직이는 원본 영상에 대한 필터 지연은 남는다. 상세 계약은 패키지 README를 따른다.
 
 매핑 발행은 `LateUpdate`, 렌더 시스템은 `SimulationSystemGroup`이다. 현재 구조에서 매핑 갱신에는 최대 한 프레임 지연이 있다.
 원본 픽셀과 추론 결과의 시간 차이, 추론 오차, 깊이 배율의 프레임별 변화까지 제거하는 시간 동기화·카메라 보정 기능은 아니다.
@@ -76,8 +76,9 @@ relativeZ = worldZ - 대상의 최대 worldZ
 ## 4. 구현과 검증
 
 - `Runtime/Ecs/Common/LandmarkOverlayMapping.cs`: 매핑 데이터, `Map`, `MapWithDepth`, 깊이 배율과 범위 집계.
-- `Runtime/Ecs/Hand/HandLandmarkRenderSystem.cs`, `Runtime/Ecs/Pose/PoseLandmarkRenderSystem.cs`: 영상 XY + 상대 월드 Z 표시.
-- `Sample/HandTracking/Scripts/WebcamBackgroundRenderer.cs`: Quad 배치와 카메라·UV 매핑 발행. 직교 카메라는 `orthographicSize`를 사용한다.
+- `Runtime/Ecs/Common/LandmarkFilterSystem.cs`: 렌더 독립 raw → filtered 처리.
+- `Runtime/Ecs/Common/LandmarkRenderSystem.cs`: 필터 결과의 영상 XY + 상대 모델 world Z 표시.
+- `Samples~/TrackingDemo/HandTracking/Scripts/WebcamBackgroundRenderer.cs`: Quad 배치와 카메라·UV 매핑 발행. 직교 카메라는 `orthographicSize`를 사용한다.
 - `Tests/EditMode/LandmarkOverlayMappingTests.cs`: 원근/직교, 카메라 이동·회전, UV 크롭·반전, 깊이·근접 클리핑, 배율·퇴화 범위 회귀 검사.
 
 시각적 결과는 미터 형상이 아닌 영상 정합용 3D 표현이다. 물리 연산이나 별도 3D 아바타에는 표시 좌표 대신 원본 월드 버퍼를 사용한다.
